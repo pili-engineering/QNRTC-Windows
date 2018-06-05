@@ -4,7 +4,7 @@ QNRTC 是七牛云推出的一款适用于 Windows 平台的实时音视频 SDK�
 
 <a id="1.1"></a>
 ## 1.1 下载地址
-- [Win32 Demo 以及 SDK 下载地址](http://sdk-release.qnsdk.com/Win32-RTCSDK-0.2.0.zip)
+- [Win32 Demo 以及 SDK 下载地址](https://github.com/pili-engineering/QNRTC-Windows)
 
 
 <a id="2"></a>
