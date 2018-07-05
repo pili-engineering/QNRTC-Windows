@@ -1,13 +1,11 @@
-<a id="1"></a>
 # 1 概述
+
 QNRTCWin 是七牛云推出的一款适用于 Windows 平台的实时音视频 SDK，提供了灵活的接口，支持高度定制以及二次开发。
 
-<a id="1.1"></a>
 ## 1.1 下载地址
 - [Win32 Demo 以及 SDK 下载地址](https://github.com/pili-engineering/QNRTC-Windows)
 
 
-<a id="2"></a>
 # 2 功能列表
 
 | 功能                                |   版本    |
@@ -22,24 +20,28 @@ QNRTCWin 是七牛云推出的一款适用于 Windows 平台的实时音视频 S
 | 支持视频码率的配置                     | v0.2.0(+) |
 | 支持视频尺寸配置                       | v0.2.0(+) |
 | 支持网络自动重连                       | v0.2.0(+) |
-| 支持丰富的消息回调                    | v0.2.0(+) |
 | 支持纯音频互动                        | v0.2.0(+) |
 | 支持获取通话质量统计信息               | v0.2.0(+) |
+| 支持网络状态回调                       | v0.2.0(+) |
+| 支持房间状态回调                       | v0.2.0(+) |
+| 支持本地音视频采集数据的回调              | v0.2.0(+) |
+| 支持远端音视频渲染数据的回调            | v0.2.0(+) |
+| 支持音视频设备插拔事件的回调            | v0.2.0(+) |
+| 支持外部音频数据导入                 | v1.0.0(+)|
+| 支持外部视频数据导入                 | v1.0.0(+)|
+| 支持屏幕、窗口的采集                   | v1.0.0(+)|
+| 支持视频渲染镜像功能                  | v1.0.0(+)|
 
-
-<a id="3"></a>
 # 3 总体设计
 
 本 SDK 基于 `Microsoft Visual Studio 2015` 进行开发，使用了运行时库的多线程静态版本，即 `MTD/MT` 配置，目前提供 Win32 平台架构的开发包。
 
-<a id="3.1"></a>
 ## 3.1 基本规则
 
 为了方便理解和使用，对于 SDK 的接口设计，我们遵循了如下的规则：
 
 - 每一个接口类，均以 `QNRTC` 开头
 
-<a id="3.2"></a>
 ## 3.2 核心接口类
 
 核心接口类说明如下：
@@ -51,7 +53,6 @@ QNRTCWin 是七牛云推出的一款适用于 Windows 平台的实时音视频 S
 | QNRTCAudio           | 音频接口类          | 包含音频设备枚举、参数配置和数据回调等|
 | QNRTCVideo           | 视频接口类          | 包含视频设备枚举、预览、参数配置和数据回调等|
 
-<a id="3.3"></a>
 ## 3.3 回调相关类
 
 回调相关类说明如下：
@@ -64,7 +65,6 @@ QNRTCWin 是七牛云推出的一款适用于 Windows 平台的实时音视频 S
 
 另外，统计信息回调中的 `StatisticsReport`，提供了通话过程中的各用户的统计信息，包括通话过程中实时的音视频码率、帧率、丢包率等信息。
 
-<a id="4"></a>
 # 4 阅读对象
 
 本文档为技术文档，需要阅读者：
@@ -72,27 +72,23 @@ QNRTCWin 是七牛云推出的一款适用于 Windows 平台的实时音视频 S
 - 具有基本的 Windows 端的开发能力
 - 准备接入七牛云实时音视频 SDK
 
-<a id="5"></a>
 # 5 开发准备
 
-<a id="5.1"></a>
 ## 5.1 开发语言以及系统要求
 
-- 开发语言：C++11 
+- 开发语言：C++14
 - 系统要求：Windows Vista 及以上版本 Windows 系统
 
-<a id="5.2"></a>
 ## 5.2 开发环境配置
 
 - Visual Studio 2015 [下载地址](https://www.visualstudio.com/zh-hans/vs/older-downloads/)
 - Win32 Platform
 
-<a id="5.3"></a>
 ## 5.3 导入 SDK
 
 将下载好的 SDK 拷贝到你的工程目录中，添加 `$(ProjectDir)Release\include` 到头文件引用目录，添加 `$(ProjectDir)Release\lib` 到依赖库查找目录中，并拷贝 `QNRtcStreamingD.dll` 和 `QNRtcStreaming.dll` 分别到 `Debug` 和 `Release` 模式的运行目录下，然后在代码中通过静态加载的方式加载 SDK 库，如下：
 
-```   
+```C++   
 #include "qn_rtc_room.h"
 #include "qn_rtc_audio.h"
 #include "qn_rtc_video.h"
@@ -107,15 +103,13 @@ using namespace qiniu;
 #endif // _DEBUG
 ```
 
-<a id="6"></a>
 # 6 快速开始
 
-<a id="6.1"></a>
 ## 6.1 初始化连麦相关对象
 
 调用 `QNRTCEngine` 接口进行全局初始化：
 
-```
+```C++
 QNRTCEngine::Init();
 // 配置日志输出等级、目录及文件名，不调用 = 不输出
 QNRTCEngine::SetLogParams(qiniu::LOG_INFO, "rtc-log", "rtc.log");
@@ -123,34 +117,33 @@ QNRTCEngine::SetLogParams(qiniu::LOG_INFO, "rtc-log", "rtc.log");
 
 创建房间 `QNRTCRoom` 实例（全局唯一）：
 
-```
+```C++
 QNRTCRoom* _rtc_room_interface = QNRTCRoom::ObtainRoomInterface();
 ```
 
 获取连麦音频 `QNRTCAudio` 接口实例指针，连麦视频 `QNRTCVideo` 接口实例指针：
 
-```
+```C++
 QNRTCAudio* _rtc_audio_interface = _rtc_room_interface->ObtainAudioInterface();
 QNRTCVideo* _rtc_video_interface = _rtc_room_interface->ObtainVideoInterface();
 ```
 
 设置房间回调、音频回调以及视频回调:
 
-```
+```C++
 // this 为实现了所有回调接口类的对象指针
 _rtc_room_interface->SetRoomListener(this);
 _rtc_audio_interface->SetAudioListener(this);
 _rtc_video_interface->SetVideoListener(this);
 ```
 
-其中各个 listener （`QNRTCRoom::QNRTCRoomListener`、`QNRTCAudio::QNRTCAudioListener`以及`QNRTCVideo::QNRTCVideoListener`）的回调相关说明，详见 [代理回调](##7.4代理回调)
+其中各个 listener （`QNRTCRoom::QNRTCRoomListener`、`QNRTCAudio::QNRTCAudioListener`以及`QNRTCVideo::QNRTCVideoListener`）的回调相关说明，详见 `7.4代理回调`。
 
-<a id="6.2"></a>
 ## 6.2 设置摄像头相关参数
 
 设置视频采集、预览、发布等相关参数
 
-```
+```C++
 CameraSetting camera_setting;
 camera_setting.render_hwnd = GetDlgItem(IDC_STATIC_VIDEO_PREVIEW)->m_hWnd;
 camera_setting.device_name = unicode2utf(cur_dev_name.GetBuffer());
@@ -161,30 +154,27 @@ camera_setting.max_fps     = 15;
 camera_setting.bitrate     = 500000;
 ```
 
-<a id="6.3"></a>
 ## 6.3 加入房间
 
-```
+```C++
 _rtc_room_interface->JoinRoom(_room_token);
 ```
 
 此处 `_room_token` 需要 App 从 App Server 中获取，App Server 如何生成 token 可[查阅文档](https://github.com/pili-engineering/QNRTC-Server/blob/master/docs/api.md#5-roomtoken-%E7%9A%84%E8%AE%A1%E7%AE%97)。
 
-<a id="6.4"></a>
 ## 6.4 发布音/视频
 
 当 `enable_audio_` 为 `true` 时可发布音频，而 `enable_video_` 为 `true` 时则可发布视频。
 
-```
+```C++
 _rtc_room_interface->Publish(true, true);
 ```
 
-<a id="6.5"></a>
 ## 6.5 订阅远端用户
 
 在远端用户发布媒体流的回调通知中订阅该用户
 
-```
+```C++
 void CRtcXXX::OnRemotePublish(const std::string& user_id_, bool has_audio_, bool has_video_){
     // itor->second.render_wnd_ptr->m_hWnd 为渲染视频的窗口句柄
     _rtc_room_interface->Subscribe(user_id_, itor->second.render_wnd_ptr->m_hWnd);
@@ -193,24 +183,21 @@ void CRtcXXX::OnRemotePublish(const std::string& user_id_, bool has_audio_, bool
 
 也可以在远端发布后，根据产品需求在合适的时机通过调用如下的方法来订阅：
 
-```   
-virtual int32_t Subscribe(const std::string& user_id_, void* render_hwnd_) = 0;
+```C++   
+virtual int Subscribe(const std::string& user_id_, void* render_hwnd_) = 0;
 ```
 
 注：用于渲染视频的窗口句柄，在 MFC 中直接使用窗口类的 m_hWnd 成员变量获取，Qt 中通过窗口类的 winId() 方法进行获取。
 
-<a id="7"></a>
 # 7 功能使用
 
-<a id="7.1"></a>
 ## 7.1 视频配置
 
-<a id="7.1.1"></a>
 ### 7.1.1 枚举摄像头列表及其采集属性
 
 视频设备属性结构体 `CameraDeviceInfo` 
 
-```   
+```C++   
 /**
 * 摄像头采集属性
 */
@@ -235,14 +222,13 @@ typedef struct _TCameraDeviceInfo
 }CameraDeviceInfo;
 ```
 
-以上可通过 `QNRTCVideo::GetCameraInfo(uint32_t device_index_)` 获取；
+以上可通过 `QNRTCVideo::GetCameraInfo(unsigned int device_index_)` 获取；
 
-<a id="7.1.2"></a>
 ### 7.1.2 视频参数配置
 
 通过 `CameraSetting` 设置指定摄像头设备信息和采集（同编码）尺寸、帧率、码率以及预览窗口句柄：
 
-```
+```C++
 typedef struct _TCameraSetting
 {
     std::string device_id;   
@@ -250,20 +236,18 @@ typedef struct _TCameraSetting
     int         width       = 640;      // 宽度
     int         height      = 480;      // 高度
     int         max_fps     = 15;       // 帧率：默认为 15fps
-    int         bitrate     = 300000;   // 视频码率，单位：bps
+    int         bitrate     = 300000;   // 视频码率，单位：bps；如果为 0，则 SDK 内部自适应
     void*       render_hwnd = nullptr;  // 视频渲染窗口句柄
 }CameraSetting;
 ```
 注：需在视频预览或发布前，调用 `QNRTCVideo::SetCameraParams(CameraSetting& camera_setting_)` 进行配置，连麦过程中调用无效。
 
-<a id="7.2"></a>
 ## 7.2 音频配置
 
-<a id="7.2.1"></a>
 ### 7.2.1 音频设备枚举
 
 音频设备信息结构体：
-```
+```C++
 /**
 * Audio device information
 */
@@ -275,7 +259,7 @@ typedef struct _TAudioDeviceInfo
 		adt_record,
 		adt_playout,
 	};
-	uint32_t        device_index;
+	unsigned int device_index;
 	AudioDeviceType device_type               = adt_invalid;
 	char device_name[QNRTC_MAX_DEVICE_LENGHT] = { 0 };
 	char device_id[QNRTC_MAX_DEVICE_LENGHT]   = { 0 };
@@ -283,10 +267,10 @@ typedef struct _TAudioDeviceInfo
 ```
 
 以上可通过 `QNRTCAudio::GetAudioDeviceInfo(
-            AudioDeviceInfo::AudioDeviceType device_type_, uint32_t device_index_, 
+            AudioDeviceInfo::AudioDeviceType device_type_, unsigned int device_index_, 
             __out AudioDeviceInfo& audio_info_)` 进行获取，如：
 
-```
+```C++
 // 枚举音频采集设备列表
 for (int i(0); i < _rtc_audio_interface->GetAudioDeviceCount(AudioDeviceInfo::adt_record); ++i) {
 	AudioDeviceInfo audio_info;
@@ -305,12 +289,11 @@ for (int i(0); i < _rtc_audio_interface->GetAudioDeviceCount(AudioDeviceInfo::ad
 }
 ```
 
-<a id="7.2.2"></a>
 ### 7.2.2 音频设备配置
 
 SDK 目前支持指定特定的音频输入、输出设备进行连麦，相关控制接口为：
 
-```
+```C++
 typedef struct _TAudioDeviceSetting
 {
 	enum WindowsDeviceType
@@ -318,7 +301,7 @@ typedef struct _TAudioDeviceSetting
 		wdt_DefaultCommunicationDevice = -1,
 		wdt_DefaultDevice = -2
 	};
-	uint16_t            device_index;   //speaker or playout device index
+	unsigned int        device_index;   //speaker or playout device index
 	WindowsDeviceType   device_type = wdt_DefaultDevice;
 }AudioDeviceSetting;
 
@@ -329,114 +312,106 @@ virtual int SetPlayoutDevice(AudioDeviceSetting playout_device_setting_) = 0;
 ```
 注：通话过程中指定设备无效，需在通话开始前进行相关操作。
 
-<a id="7.3"></a>
 ## 7.3 连麦相关操作
 
 主要包括加入、离开房间，发布、取消、静默本地媒体流，订阅、取消订阅远端媒体流，以及其它用户进入、离开房间的管理、通知，以及服务端合流相关的配置操作等。
 
-<a id="7.3.1"></a>
 ### 7.3.1 加入/离开房间
 
 - 加入房间
 
-```   
-virtual int32_t JoinRoom(const std::string& room_token_) = 0;
+```C++
+virtual int JoinRoom(const std::string& room_token_) = 0;
 ```
 
 此方法为异步方法，执行结果在 `QNRTCRoomListener::OnJoinResult` 进行通知，错误码请参考错误码列表；
 
 - 离开房间
 
-```   
-virtual int32_t LeaveRoom() = 0;
+```C++
+virtual int LeaveRoom() = 0;
 ```
 
 此方法为用户主动退出房间，为同步方法，没有回调通知；
 
-<a id="7.3.2"></a>
 ### 7.3.2 发布/取消发布 
 
 - 发布本地音/视频流，成功后远端可以订阅收看
 
-```   
-virtual int32_t Publish(bool enable_audio_ = true, bool enable_video_ = true) = 0;
+```C++
+virtual int Publish(bool enable_audio_ = true, bool enable_video_ = true) = 0;
 ```
 
 此方法为异步方法，执行结果在 `QNRTCRoomListener::OnLocalPublishResult` 进行通知，错误码请参考错误码列表；
 
 - 取消发布本地音/视频流
 
-```   
-virtual int32_t UnPublish() = 0;
+```C++
+virtual int UnPublish() = 0;
 ```
 
 此方法为同步方法，没有异步回调通知接口；
 
-<a id="7.3.3"></a>
 ### 7.3.3 订阅/取消订阅 
 
 - 订阅远端用户的音/视频
 
-```   
-virtual int32_t Subscribe(const std::string& user_id_, void* render_hwnd_) = 0;
+```C++
+virtual int Subscribe(const std::string& user_id_, void* render_hwnd_) = 0;
 ```
 
 此方法为异步方法，执行结果在 `QNRTCRoomListener::OnSubscribeResult` 进行通知，错误码请参考错误码列表；
 
 - 取消订阅远端用户的音/视频
 
-```   
-virtual int32_t UnSubscribe(const std::string& user_id_) = 0;
+```C++
+virtual int UnSubscribe(const std::string& user_id_) = 0;
 ```
 
 此方法为同步方法，没有异步回调通知接口；
 
-<a id="7.3.4"></a>
 ### 7.3.4 踢人
 
 将用户 user_id_ 踢出房间
 
-```   
-virtual int32_t KickoutUser(const std::string& user_id_) = 0;
+```C++
+virtual int KickoutUser(const std::string& user_id_) = 0;
 ```
 
 此方法需要拥有 `admin` 权限（获取`RoomToken`时指定）才可以踢人成功，此方法为异步方法，执行结果通过 `QNRTCRoomListener::OnKickoutResult` 进行通知；
 
-<a id="7.3.5"></a>
 ### 7.3.5 Mute 本地音/视频
 
 - 静默本地已发布视频流，置为 `true` 后，远端用户用户看到的视频画面将为黑色，本地预览也为黑色，置为 `false` 后，取消静默，恢复原状；
 
-```
-virtual int32_t MuteVideo(bool mute_flag_) = 0;   
+```C++
+virtual int MuteVideo(bool mute_flag_) = 0;   
 ```
 
 - 静默本地已发布音频流，置为 `true` 后，远端用户用户将无法听你到你的声音，置为 `false` 后，取消静默，恢复原状；
 
-```   
-virtual int32_t MuteAudio(bool mute_flag_) = 0;
+```C++
+virtual int MuteAudio(bool mute_flag_) = 0;
 ```
 
-<a id="7.4"></a>
 ## 7.4 `QNRTCRoom::QNRTCRoomListener` 代理回调
 
 >主要是房间管理和通知的异步回调。
 
-<a id="7.4.1"></a>
 ### 7.4.1 用户加入房间的回调
 
-```
+```C++
 // JoinRoom 加入房间的异步操作结果通知
 // @param error_code_ 为执行结果，为 0 表示加入房间成功，其它请参考错误码列表
 // @param error_str_ 为加入房间失败时，对失败原因的描述，成功时为空字符串
 // @param suer_date_vec_ 当加入房间成功时，在此房间内已有的用户信息列表
-virtual void OnJoinResult(int32_t error_code_, const std::string& error_str_,
+virtual void OnJoinResult(int error_code_, const std::string& error_str_,
                 const UserDataInfoVec& user_data_vec_) = 0;
 ```
 
 用户信息 `UserDataInfo` 的定义：
 
-```
+```C++
 typedef struct _TUserDataInfo
 {
 	std::string user_id;                    // 房间内用户 ID
@@ -449,10 +424,9 @@ typedef struct _TUserDataInfo
 typedef std::vector<UserDataInfo>   UserDataInfoVec;
 ```
 
-<a id="7.4.2"></a>
 ### 7.4.2 房间状态变化的回调
 
-```
+```C++
 // 房间网络状态变化通知
 // @brief 网络断开时，SDK 内部会自动进行重连，每次重连时，会通过此接口回调通知 rs_reconnecting 状态
 // @param status_ 房间当前的网络状态
@@ -461,7 +435,7 @@ virtual void OnStateChanged(RoomState status_) = 0;
 
 房间状态 `RoomState` 定义：
 
-```   
+```C++
 enum RoomState
 {
     rs_idle,            // 空闲状态，未连接
@@ -471,21 +445,19 @@ enum RoomState
 };
 ```
 
-<a id="7.4.3"></a>
 ### 7.4.3 发布本地音视频回调
 
-```
+```C++
 // @param error_code_ Publish 方法执行结果，0 为成功，其它请参考错误码列表
 // @param error_str_ error_code_ 非 0 时，用于错误描述字符串
-virtual void OnLocalPublishResult(int32_t error_code_, const std::string& error_str_) = 0;
+virtual void OnLocalPublishResult(int error_code_, const std::string& error_str_) = 0;
 ```
 
-<a id="7.4.4"></a>
 ### 7.4.4 远端用户加入／离开房间的回调
 
 - 远端用户加入房间的回调
 
-```
+```C++
 // @param user_id_ 远端用户在此房间内的唯一标识
 // @param user_data_ 用户自定义数据字符串，暂为空
 virtual void OnRemoteUserJoin(const std::string& user_id_, const std::string& user_data_) = 0;
@@ -493,18 +465,17 @@ virtual void OnRemoteUserJoin(const std::string& user_id_, const std::string& us
 
 - 远端用户离开房间的回调
 
-```
+```C++
 // @param user_id_ 远端用户在此房间内的唯一标识
 // @param error_code_ 用户离开房间的原因，0 为主动离开，其它请参考错误码列表，一般为被踢出房间，即 Err_Kickout_Of_Room : 10006
-virtual void OnRemoteUserLeave(const std::string& user_id_, int32_t error_code_) = 0;
+virtual void OnRemoteUserLeave(const std::string& user_id_, int error_code_) = 0;
 ```
 
-<a id="7.4.5"></a>
 ### 7.4.5 远端用户发布／取消发布音视频的回调
 
 - 远端用户发布音视频的回调
 
-```
+```C++
 // @param user_id_ 远端用户在此房间内的唯一标识
 // @param enable_audio_ 此用户是否发布了音频
 // @param enable_video_ 此用户是否发布了视频
@@ -513,58 +484,54 @@ virtual void OnRemotePublish(const std::string& user_id_, bool enable_audio_, bo
 
 - 远端用户取消发布音视频的回调
 
-```   
+```C++
 virtual void OnRemoteUnPublish(const std::string& user_id_) = 0;
 ```
 
-<a id="7.4.6"></a>
 ### 7.4.6 订阅远端用户的回调
 
 - 订阅远端用户的回调
 
-```
+```C++
 // Subscribe 方法执行结果
 // @param user_id_ 远端用户在此房间内的唯一标识
 // @param error_code_ 0 为成功，其它请参考错误码列表
 // @param error_str_ error_code_ 非 0 时，用于错误描述字符串
-virtual void OnSubscribeResult(const std::string& user_id_, int32_t error_code_, const std::string& error_str_) = 0;
+virtual void OnSubscribeResult(const std::string& user_id_, int error_code_, const std::string& error_str_) = 0;
 ```
 
-<a id="7.4.7"></a>
 ### 7.4.7 远端用户音/视频 Mute 状态的回调
 
 - 远端用户静默（或取消静默）了其音、视频流
 
-```
+```C++
 // @param user_id_ 远端用户在此房间内的唯一标识
 // @param mute_audio_ 用户是否静默了音频
 // @param mute_video_ 用户是否静默了视频
 virtual void OnRemoteStreamMute(const std::string& user_id_, const bool mute_audio_, bool mute_video_) = 0;
 ```
 
-<a id="7.4.8"></a>
 ### 7.4.8 踢人回调
 
 本地调用 `KickoutUser` 方法的执行结果通知，此操作需要 `admin` 权限
 
-```
+```C++
 // KickoutUser 方法执行结果
 // @param user_id_ 远端用户在此房间内的唯一标识
 // @param error_code_ 0 为成功，其它请参考错误码列表
 // @param error_str_ error_code_ 非 0 时，用于错误描述字符串
 virtual void OnKickoutResultconst std::string& user_id_,
-                int32_t error_code_, const std::string& error_str_) = 0;
+                int error_code_, const std::string& error_str_) = 0;
 ```
 
-<a id="7.4.9"></a>
 ### 7.4.9 SDK 运行过程中的错误回调
 
 SDK 运行过程中发生错误会通过该方法回调，具体错误码的定义可以参阅 `qn_rtc_errorcode.h` 文件
 
-```
+```C++
 // @param error_code_ 错误码
 // @param error_str_ error_code_ 非 0 时，用于错误描述字符串
-virtual void OnError(int32_t error_code_, const std::string& error_str_) = 0;
+virtual void OnError(int error_code_, const std::string& error_str_) = 0;
 ```
 
 错误码列表如下：
@@ -626,28 +593,26 @@ virtual void OnError(int32_t error_code_, const std::string& error_str_) = 0;
 | `Err_Parse_Access_Token_Failed` | 11035 | 解析 Access Token 失败 |
 | `Err_Parse_Room_Server_Address_Failed` | 11036 | 解析房间服务地址失败 |
 | `Err_Get_AccessToken_Timeout` | 11040 | 请求获取 Access Token 超时 |
+| `Err_VideoCapture_Not_Running` | 11050 | 视频采集模块未启动 |
 
-<a id="7.4.10"></a>
 ### 7.4.10 统计信息的回调
 
-```
+```C++
 // 通话质量统计信息回调，可通过 EnableStatisticCallback 进行设置
 virtual void OnStatisticsUpdated(const StatisticsReport& statistics_) = 0;
 ```
 
 设置统计信息回调的时间间隔
 
-```   
-virtual void    EnableStatisticCallback(int32_t period_second_ = 5) = 0;
+```C++
+virtual void    EnableStatisticCallback(int period_second_ = 5) = 0;
 ```
 
-<a id="7.5"></a>
 ## 7.5 `QNRTCVideo::QNRTCVideoListener` 代理回调
 
-<a id="7.5.1"></a>
 ### 7.5.1 视频 YUV 数据回调
 
-```
+```C++
 // @param raw_data_ 指向 YUV 数据的内存地址
 // @param data_len_ raw_data_ 数据长度，单位：Byte
 // @param video_type_ 导出的数据格式，一般为 kI420，即：YUV420P
@@ -657,37 +622,33 @@ virtual void OnVideoFrame(const unsigned char* raw_data_, int data_len_, qiniu::
 
 本地预览、发布，订阅远端用户视频流的原始视频流数据的回调，一般为 YUV420P 格式；
 
-<a id="7.5.2"></a>
 ### 7.5.2 视频设备插拔状态的回调
 
-```
+```C++
 virtual void OnVideoDeviceStateChanged(VideoDeviceState device_state_, const std::string& device_name_) = 0;
 ```
 
 视频设备仅监控当前已打开的设备；如果在用户正在预览、发布的过程中，插拔了此设备，则必须重新开启预览、发布，才能恢复正常的工作。
 
-<a id="7.6"></a>
 ## 7.6 `QNRTCAudio::QNRTCAudioListener` 代理回调
 
-<a id="7.6.1"></a>
 ### 7.6.1 连麦音频 PCM 数据回调
 
-```
+```C++
 // @param audio_data_ 音频 PCM 数据
 // @param bits_per_sample_ 采样位深
 // @param sample_rate_ 采样率
 // @param number_of_channels_ 声道数
 // @param number_of_frames_ 采样点数
-// @param user_id_ 数据所属用户 ID
+// @param user_id_ 数据所属用户 ID；如果为空，则为所有远端用户音频数据混音后用于播放的 PCM 数据
 virtual void OnAudioPCMFrame(const void* audio_data_, int bits_per_sample_,
                 int sample_rate_, size_t number_of_channels_, 
                 size_t number_of_frames_, const std::string& user_id_) = 0;
 ```
 
-<a id="7.6.2"></a>
 ### 7.6.2 音频设备状态变化的回调
 
-```
+```C++
 // @param device_state_ 音频设备状态
 // @param device_guid_ 设备唯一标识：GUID
 virtual void OnAudioDeviceStateChanged(
@@ -696,15 +657,13 @@ virtual void OnAudioDeviceStateChanged(
 
 监控系统中所有的音频输入、输出设备的插拔状态；
 
-<a id="7.7"></a>
 ## 7.7 其他功能
 
-<a id="7.7.1"></a>
 ### 7.7.1 服务端合流
 
 - 开启合流功能设置
 
-```
+```C++
 // 设置服务器合流参数
 // @param user_id_ 用户 ID
 // @param pos_x_ 起始横轴坐标，原点坐标为左上角
@@ -714,25 +673,24 @@ virtual void OnAudioDeviceStateChanged(
 // @param height_ 此用户媒体流合流后在画布中的高度
 // @param is_visible_ 是否可见
 // @return 0：成功，其它请参考错误码
-virtual int32_t SetMergeStreamLayout(const std::string& user_id_, 
-            int32_t pos_x_, int32_t pos_y_, int32_t pos_z_, 
-            int32_t width_, int32_t height_, bool is_visible_) = 0;
+virtual int SetMergeStreamLayout(const std::string& user_id_, 
+            int pos_x_, int pos_y_, int pos_z_, 
+            int width_, int height_, bool is_visible_) = 0;
 ```
 
 - 关闭合流功能
 
-```
-virtual int32_t StopMergeStream() = 0;
+```C++
+virtual int StopMergeStream() = 0;
 ```
 
 建议一个房间内同时只有一个用户可以控制服务端合流的配置，当此用户离开房间时，务必调用 `StopMergeStream` 取消合流操作，以免旁路推流（RTMP 流）出现黑屏现象。
 
-<a id="7.7.2"></a>
 ### 7.7.2 关于 SDK 的日志文件
 
-开启 SDK 文件日志，不调用则不记录
+- 开启 SDK 文件日志，不调用则不记录
 
-```
+```C++
 // @param level_ 日志级别
 // @param dir_name_ 日志文件存放目录
 // @param file_name_ 日志文件名
@@ -740,8 +698,129 @@ static int QNRTCEngine::SetLogParams(QNLogLevel level_,
             const std::string& dir_name_, const std::string& file_name_);
 ```
 
-<a id="8"></a>
+### 7.7.3 导入外部音视频数据
+
+- 音频
+
+导入外部音频数据涉及 `QNRTCAudio` 中以下三个接口：
+
+```C++
+// 开启或关闭外部音频导入的功能，需在 Publish 之前进行调用
+// @param enable_flag_ true:开启；false：关闭
+// @return 是否开启成功，如果失败则返回非 0 值
+virtual int EnableAudioFakeInput(bool enable_flag_) = 0;
+
+// 导入外部音频 PCM 数据，目前仅支持 signed 16bit per sample， mono 和 stereo 声道数；
+// 导入外部音频数据需要均匀控制频率，过高或过低均会导致连麦语音质量的下降
+// @param audio_data_ PCM 数据指针
+// @param data_size_ 数据大小
+// @param bits_per_sample_ 位深，目前仅支持 16bit
+// @param sample_rate_ 输入音频数据的采样率
+// @param number_of_channels_ 输入音频的声道数
+// @param number_of_frames_ audio_data_ 数据中包含的采样点数（每声道）
+virtual int InputAudioFrame(
+    const void* audio_data_,
+    unsigned int data_size_,
+    unsigned int bits_per_sample_,
+    unsigned int sample_rate_,
+    unsigned int number_of_channels_,
+    unsigned int number_of_frames_
+) = 0;
+
+// 判断是否激活了导入外部音频数据的功能
+virtual bool IsEnableAudioFakeInput() = 0;
+```
+
+- 视频
+
+导入外部视频数据涉及 `QNRTCVideo` 中以下三个接口，分别如下：
+
+```C++
+// 开启或关闭外部视频导入的功能，需在 Publish 之前进行调用
+// @param enable_flag_ true:开启；false：关闭
+// @return 是否开启成功，如果失败则返回非 0 值
+virtual int EnableVideoFakeCamera(bool enable_flag_) = 0;
+
+// 实时导入外部视频原始数据，目前支持 kI420 kYUY2 kRGB24 格式
+// @param data_ 原始视频数据指针
+// @param data_size_ 原始视频数据大小
+// @param width_ 导入视频的宽度
+// @param height_ 导入视频的高度
+// @param timestamp_us_ 视频时间戳，单位：微妙
+// @param raw_type_ 导入视频的数据格式，目前支持的格式为：kI420 kYUY2 kRGB24
+// @param rotation_ 导入后视频旋转角度，默认不旋转
+// @param mirror_flag_ 导入后是否镜像（水平旋转）
+virtual int InputVideoFrame(
+    const unsigned char* data_, 
+    const unsigned int& data_size_,
+    const unsigned int& width_,
+    const unsigned int& height_,
+    const unsigned long long& timestamp_us_,
+    qiniu::VideoCaptureType raw_type_,
+    qiniu::VideoRotation rotation_ = kVideoRotation_0,
+    bool mirror_flag_ = false
+    ) = 0;
+
+// 判断是否激活了导入外部视频数据的功能
+virtual bool IsEnableVideoFakeCamera() = 0;
+```
+
+### 7.7.4 屏幕分享
+
+屏幕分享以视频的格式对外发布，所以其接口集成在 `QNRTCVideo` 中，主要接口如下：
+
+```C++
+// 屏幕、窗口信息结构体
+typedef struct _TScreenWindowInfo
+{
+    int          id;        // 窗口 id，唯一标识
+    std::string  title;     // 窗口标题
+    bool         is_screen; // 是否是显示器，true：显示器；false：窗口
+} ScreenWindowInfo;
+
+// 获取当前可被抓取的屏幕和窗口的数量（最小化的窗口不计算）
+virtual int GetScreenWindowCount() = 0;
+
+// 获取指定序号的屏幕、窗口信息，以 ScreenWindowInfo 的格式返回
+// @param index_ 屏幕、窗口序号，0 ~ GetScreenWindowCount()
+// @return ScreenWindowInfo 结构体，如果指定窗口不存在，则 ScreenWindowInfo::id 小于 0
+virtual ScreenWindowInfo& GetScreenWindowInfo(const int& index_) const = 0;
+
+// 激活并设置需要分享的窗口 id（ScreenWindowInfo::id）；如果需要关闭屏幕分享功能，则传入 -1 即可
+// @param source_id_ 屏幕或者窗口的 ID
+// @return 成功返回 0， 其它请参考错误码列表
+virtual int EnableAndSetScreenSourceId(const int& source_id_) = 0;
+
+// 获取当前通过 EnableAndSetScreenSourceId 设置的屏幕或者窗口的 ID，如果未设置，则返回 -1
+virtual int GetScreenSourceId() = 0;
+```
+
+### 7.7.5 视频镜像
+
+SDK 为所有的视频渲染提供了镜像功能（左右反转）接口，集成在 `QNRTCVideo` 中:
+
+```C++
+// 为指定用户的视频在本地渲染时提供镜像功能
+// @param user_id_ 需要镜像的用户 ID
+// @param mirror_flag_ 是否镜像
+// @return 成功返回 0， 其它请参考错误码列表
+virtual int SetMirrorWhenDisplay(const std::string& user_id_, bool mirror_flag_) = 0;
+```
+
 # 8 历史记录
+
+- 1.0.0
+    ## 功能
+    - 支持导入外部 PCM 音频数据
+    - 支持导入外部 RAW 视频数据
+    - 支持屏幕、窗口的采集
+    - 支持视频渲染镜像功能
+
+    ## 缺陷
+    - 修复部分摄像头采集失败的问题
+    - 修复 Surface Pro 设备打开摄像头崩溃的问题
+    - 修复某些场景下音频设备枚举失败的问题 
+
 - 0.2.0
     - 基本的音视频通话功能
     - 内置音视频采集功能
@@ -753,15 +832,14 @@ static int QNRTCEngine::SetLogParams(QNLogLevel level_,
     - 支持视频码率的配置 
     - 支持视频尺寸配置 
     - 支持网络自动重连 
-    - 支持丰富的消息回调 
     - 支持纯音频互动 
     - 支持获取通话质量统计信息（帧率、码率、丢包率等）
-    
+    - 支持本地音视频采集数据的回调
+    - 支持远端音视频渲染数据的回调
+    - 支持音视频设备插拔事件的回调
 
-<a id="9"></a>
 # 9 FAQ
 
-<a id="9.1"></a>
 ## 9.1 是否有服务端的 SDK 或者 demo 代码可以参考？
 
 有的，请参考： [QNRTC-Server](https://github.com/pili-engineering/QNRTC-Server)

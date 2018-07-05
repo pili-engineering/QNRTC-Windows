@@ -47,7 +47,7 @@ namespace qiniu
         std::string         device_id;
         std::string         device_name;
         CameraCapabilityVec capability_vec;
-    }CameraDeviceInfo;
+    } CameraDeviceInfo;
 
     typedef std::vector<CameraDeviceInfo> CameraDeviceInfoVec;
 
@@ -63,7 +63,7 @@ namespace qiniu
         int         max_fps     = 15;       //video frames per second
         int         bitrate     = 300000;   //video encode bitrate, unit:bps
         void*       render_hwnd = nullptr;  //video render window hwnd,MFC:HWND; QT:winId
-    }CameraSetting;
+    } CameraSetting;
 
     /**
     * Video device state
@@ -74,6 +74,26 @@ namespace qiniu
         vds_lost    = 0x00000002,           //the video device is lost
     };
 
+    /** 
+    * enum for clockwise rotation.
+    */
+    enum VideoRotation
+    {
+        kVideoRotation_0   = 0,
+        kVideoRotation_90  = 90,
+        kVideoRotation_180 = 180,
+        kVideoRotation_270 = 270
+    };
+
+    /**
+    * Screen windows info
+    */
+    typedef struct _TScreenWindowInfo
+    {
+        int          id;        // windows id
+        std::string  title;     // windows title
+        bool         is_screen; // is screen, true:sreen; false:window
+    } ScreenWindowInfo;
 
     /*!
      * \class QNRTCVideo
@@ -98,6 +118,10 @@ namespace qiniu
             *        pointer to video frame data
             * @param [in] data_len_
             *        video frame data size
+            * @param [in] width_
+            *        video frame width
+            * @param [in] height_
+            *        video frame height
             * @param [in] video_type_
             *        video frame raw data format
             * @param [in] stream_id_ 
@@ -105,8 +129,14 @@ namespace qiniu
             * @param [in] user_id_
             *        user id of this video source 
             */
-            virtual void OnVideoFrame(const unsigned char* raw_data_, int data_len_, 
-                qiniu::VideoCaptureType video_type_, const std::string& user_id_) = 0;
+            virtual void OnVideoFrame(
+                const unsigned char* raw_data_, 
+                int data_len_, 
+                int width_, 
+                int height_, 
+                qiniu::VideoCaptureType video_type_, 
+                const std::string& user_id_
+            ) = 0;
 
             /** Video device plug-in event notification,only for devices in use
             * @param [in] device_state_
@@ -115,7 +145,9 @@ namespace qiniu
             *        video device name
             */
             virtual void OnVideoDeviceStateChanged(
-                VideoDeviceState device_state_, const std::string& device_name_) = 0;
+                VideoDeviceState device_state_, 
+                const std::string& device_name_
+            ) = 0;
 
         protected:
             virtual ~QNRTCVideoListener() {}
@@ -124,14 +156,14 @@ namespace qiniu
         /** Get the number of local cameras
         * @return the number of local cameras
         */
-        virtual int32_t GetCameraCount() = 0;
+        virtual int GetCameraCount() = 0;
 
         /** Get specified camera devices information
         * @param [in] device_index_
         *        output local camera's device informations
         * @return return an object of CameraDeviceInfo
         */
-        virtual const CameraDeviceInfo& GetCameraInfo(uint32_t device_index_) = 0;
+        virtual const CameraDeviceInfo& GetCameraInfo(unsigned int device_index_) = 0;
 
         /** Set the video module event listener interface, you must set it to nullptr 
         *   before exiting the room
@@ -165,6 +197,87 @@ namespace qiniu
         * @return return 0 if success or an error code
         */
         virtual int UnPreviewCamera() = 0;
+
+        /** Enable or disable external data import feature
+        * @param [in] enable_flag_ 
+        *        true:enable, false:disable;
+        * @return return 0 if success or an error code
+        * @brief developer must call this method before InputVideoFrame
+        */
+        virtual int EnableVideoFakeCamera(bool enable_flag_) = 0;
+
+        /** Import video frame data when external data import feature enabled
+        * @param [in] data_
+        *        video frame data pointer
+        * @param [in] data_size_
+        *        video frame data size
+        * @param [in] width_
+        *        picture width
+        * @param [in] height_
+        *        picture height
+        * @param [in] timestamp_us_
+        *        video frame timestamp, unit:microsecond
+        * @param [in] raw_type_
+        *        video frame type, currently supports three formats: kI420 kYUY2 kRGB24
+        * @param [in] rotation_
+        *        clockwise rotation, default is kVideoRotation_0
+        * @param [in] mirror_flag_
+        *        whether the input video frame need mirror
+        * @return return 0 if success or an error code
+        * @brief developer must call EnableVideoFakeCamera(true) first
+        */
+        virtual int InputVideoFrame(
+            const unsigned char* data_, 
+            const unsigned int& data_size_,
+            const unsigned int& width_,
+            const unsigned int& height_,
+            const unsigned long long& timestamp_us_,
+            qiniu::VideoCaptureType raw_type_,
+            qiniu::VideoRotation rotation_ = kVideoRotation_0,
+            bool mirror_flag_ = false
+            ) = 0;
+
+        /** Whether enabled video fake camera future
+        * @return true: enable, false: disable
+        */
+        virtual bool IsEnableVideoFakeCamera() = 0;
+
+        /** Get the number of screen windows
+        * @return the number of local screen windows
+        * @brief not thread safe
+        */
+        virtual int GetScreenWindowCount() = 0;
+
+        /** Get specified screen window's information
+        * @param [in] screen window's index
+        * @return return an object of ScreenWindowInfo
+        * @brief not thread safe
+        */
+        virtual ScreenWindowInfo& GetScreenWindowInfo(const int& index_) const = 0;
+
+        /** Enable or disable screen share,if source_id_ >= 0 ,enable; if source_id_ < 0, disable;
+        * @param [in] source_id_
+        *        screen window source id, obtain by method:GetScreenWindowInfo
+        * @param [in] allow_directx_capturer_
+        *        allowing directx based capturer or not, this capturer works on windows 7
+        *        with platform update / windows 8 or upper.
+        * @return return 0 if success, or an error code
+        */
+        virtual int EnableAndSetScreenSourceId(const int& source_id_, bool allow_directx_capturer_ = false) = 0;
+
+        /** Get screen source id, if < 0, not enable
+        * @return enable and set screen source's id, if not enable, it will return -1
+        */
+        virtual int GetScreenSourceId() = 0;
+
+        /** Mirroring the specified user, mirror = left and right rotation
+        * @param [in] user_id_
+        *        specified user id
+        * @param [in] mirror_flag_
+        *        mirror flag, true or false
+        * @return is set success
+        */
+        virtual int SetMirrorWhenDisplay(const std::string& user_id_, bool mirror_flag_) = 0;
         
     protected:
         virtual ~QNRTCVideo() {}

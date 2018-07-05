@@ -35,13 +35,13 @@ namespace qiniu
     {
         std::string user_id;
         // audio parameters      
-        int32_t     audio_bitrate          = 0;     // audio bitrate,unit:bps
+        int         audio_bitrate          = 0;     // audio bitrate,unit:bps
         float       audio_packet_lost_rate = 0.0f;  // audio packet lost rate
         // video parameters
-        int32_t     video_width            = 0;     // video width
-        int32_t     video_height           = 0;     // video height
-        int32_t     video_frame_rate       = 0;     // video frames per second
-        int32_t     video_bitrate          = 0;     // video bitrate,unit:bps
+        int         video_width            = 0;     // video width
+        int         video_height           = 0;     // video height
+        int         video_frame_rate       = 0;     // video frames per second
+        int         video_bitrate          = 0;     // video bitrate,unit:bps
         float       video_packet_lost_rate = 0.0f;  // video packet lost rate
     } StatisticsReport;
 
@@ -76,8 +76,11 @@ namespace qiniu
             * @param [in] user_data_vec_ 
             *        the existing users in the room and the information they have published
             */
-            virtual void OnJoinResult(int32_t error_code_, const std::string& error_str_,
-                const UserDataInfoVec& user_data_vec_) = 0;
+            virtual void OnJoinResult(
+                int error_code_, 
+                const std::string& error_str_,
+                const UserDataInfoVec& user_data_vec_
+            ) = 0;
 
             /** Leave room asynchronous notification, may be kicked by others or room closed or whatever
             * @param [in] error_code_ 
@@ -87,8 +90,11 @@ namespace qiniu
             * @param [in] kicker_user_id_
             *        If it is kicked out of the room, this parameter indicates the id of the kicker
             */
-            virtual void OnLeave(int32_t error_code_, const std::string& error_str_, 
-                const std::string& kicker_user_id_) = 0;
+            virtual void OnLeave(
+                int error_code_, 
+                const std::string& error_str_, 
+                const std::string& kicker_user_id_
+            ) = 0;
 
             /** Other users joined this room
             * @param [in] user_id_ 
@@ -96,7 +102,10 @@ namespace qiniu
             * @param [in] user_data_ 
             *        user-defined data, may be empty
             */
-            virtual void OnRemoteUserJoin(const std::string& user_id_, const std::string& user_data_) = 0;
+            virtual void OnRemoteUserJoin(
+                const std::string& user_id_, 
+                const std::string& user_data_
+            ) = 0;
 
             /** Other users leaved this room
             * @param [in] user_id_
@@ -104,7 +113,10 @@ namespace qiniu
             * @param [in] error_code_
             *        error code
             */
-            virtual void OnRemoteUserLeave(const std::string& user_id_, int32_t error_code_) = 0;
+            virtual void OnRemoteUserLeave(
+                const std::string& user_id_, 
+                int error_code_
+            ) = 0;
 
             /** Other users in the room has published media stream
             * @param [in] user_id_
@@ -114,7 +126,11 @@ namespace qiniu
             * @param [in] enable_video_
             *        does it contains video stream
             */
-            virtual void OnRemotePublish(const std::string& user_id_, bool enable_audio_, bool enable_video_) = 0;
+            virtual void OnRemotePublish(
+                const std::string& user_id_, 
+                bool enable_audio_, 
+                bool enable_video_
+            ) = 0;
 
             /** Other users in the room canceled of publish media stream
             * @param [in] user_id_
@@ -128,7 +144,7 @@ namespace qiniu
             * @param [in] error_str_
             *        error info
             */
-            virtual void OnLocalPublishResult(int32_t error_code_, const std::string& error_str_) = 0;
+            virtual void OnLocalPublishResult(int error_code_, const std::string& error_str_) = 0;
 
             /** The response of subscribe stream
             * @param [in] user_id_
@@ -138,8 +154,11 @@ namespace qiniu
             * @param [in] error_str_
             *        error info
             */
-            virtual void OnSubscribeResult(const std::string& user_id_, 
-                int32_t error_code_, const std::string& error_str_) = 0;
+            virtual void OnSubscribeResult(
+                const std::string& user_id_, 
+                int error_code_, 
+                const std::string& error_str_
+            ) = 0;
 
             /** The response of kickout user
             * @param [in] user_id_
@@ -149,8 +168,11 @@ namespace qiniu
             * @param [in] error_str_
             *        error info
             */
-            virtual void OnKickoutResult(const std::string& user_id_,
-                int32_t error_code_, const std::string& error_str_) = 0;
+            virtual void OnKickoutResult(
+                const std::string& user_id_,
+                int error_code_, 
+                const std::string& error_str_
+            ) = 0;
 
             /** Notification of remote user mute or unmute audio or video stream.
             * @param [in] user_id_
@@ -160,8 +182,11 @@ namespace qiniu
             * @param [in] mute_video_
             *        the mute state of the video stream
             */
-            virtual void OnRemoteStreamMute(const std::string& user_id_, 
-                bool mute_audio_, bool mute_video_) = 0;
+            virtual void OnRemoteStreamMute(
+                const std::string& user_id_, 
+                bool mute_audio_, 
+                bool mute_video_
+            ) = 0;
 
             /** This callback is triggered when an error occurs
             * @param [in] error_code_
@@ -169,7 +194,7 @@ namespace qiniu
             * @param [in] error_str_
             *        error info
             */
-            virtual void OnError(int32_t error_code_, const std::string& error_str_) = 0;
+            virtual void OnError(int error_code_, const std::string& error_str_) = 0;
 
             /** Callback fired once statistics report arrived
             * @param [in] statistics_
@@ -221,12 +246,12 @@ namespace qiniu
         *        login authentication string
         * @return return 0 if success or an error code
         */
-        virtual int32_t JoinRoom(const std::string& room_token_) = 0;
+        virtual int JoinRoom(const std::string& room_token_) = 0;
 
         /** Leave the room
         * @return return 0 if success or an error code
         */
-        virtual int32_t LeaveRoom() = 0;
+        virtual int LeaveRoom() = 0;
 
         /** Determine if you have successfully entered the room
         * @return true or false
@@ -241,7 +266,7 @@ namespace qiniu
         /** Get local user id if you has joined the room
         * @return user id
         */
-        virtual const std::string& GetUserID() = 0;
+        virtual const std::string& GetUserId() = 0;
 
         /** Publish local media streams
         * @param [in] enable_audio_
@@ -250,12 +275,12 @@ namespace qiniu
         *        whether to publish video stream
         * @return return 0 if success or an error code
         */
-        virtual int32_t Publish(bool enable_audio_ = true, bool enable_video_ = true) = 0;
+        virtual int Publish(bool enable_audio_ = true, bool enable_video_ = true) = 0;
 
         /** Cancel publish local media streams
         * @return return 0 if success or an error code
         */
-        virtual int32_t UnPublish() = 0;
+        virtual int UnPublish() = 0;
 
         /** Subscribe to the specified user's media stream
         * @param [in] user_id_
@@ -265,42 +290,42 @@ namespace qiniu
         *        if it is empty, does not render video
         * @return return 0 if success or an error code
         */
-        virtual int32_t Subscribe(const std::string& user_id_, void* render_hwnd_) = 0;
+        virtual int Subscribe(const std::string& user_id_, void* render_hwnd_) = 0;
 
         /** Cancel subscribe to the specified user's media stream
         * @param [in] user_id_
         *        the user id that will be cancel subscribed
         * @return return 0 if success or an error code
         */
-        virtual int32_t UnSubscribe(const std::string& user_id_) = 0;
+        virtual int UnSubscribe(const std::string& user_id_) = 0;
 
         /** Kick out user
         * @param [in] user_id_
         *        the user id that will be kicked, you must have administrator privileges
         * @return return 0 if success or an error code
         */
-        virtual int32_t KickoutUser(const std::string& user_id_) = 0;
+        virtual int KickoutUser(const std::string& user_id_) = 0;
 
         /** Mute audio stream
         * @param [in] mute_flag_
         *        the audio track will produce silence, can be disabled and re-enabled
         * @return return 0 if success or an error code
         */
-        virtual int32_t MuteAudio(bool mute_flag_) = 0;
+        virtual int MuteAudio(bool mute_flag_) = 0;
 
         /** Mute video stream
         * @param [in] mute_flag_
         *         the video track black frames, can be disabled and re-enabled
         * @return return 0 if success or an error code
         */
-        virtual int32_t MuteVideo(bool mute_flag_) = 0;
+        virtual int MuteVideo(bool mute_flag_) = 0;
 
         /** Enable or disable statistics info, will got on QNRTCRoomListener::OnStatisticsUpdated
         * @param [in]period_second_ 
         *        statistics period, unit: second, if 0 will no statistics info
         */
-        virtual void    EnableStatisticCallback(int32_t period_second_ = 5) = 0;
-
+        virtual void EnableStatisticCallback(int period_second_ = 5) = 0;
+        
         /** Configuring server-side stream merge parameters
         * @param [in] user_id_ 
         *         user id
@@ -314,18 +339,27 @@ namespace qiniu
         *         The width in the canvas after this user's stream merged
         * @param [in] height_ 
         *         The height in the canvas after this user's stream merged
-        * @param [in] is_visible_ 
-        *         Visibility
+        * @param [in] hide_video_ 
+        *         Is video visibility
+        * @param [in] mute_audio_
+        *         Is audio mute
         * @return return 0 if success or an error code
         */
-        virtual int32_t SetMergeStreamLayout(const std::string& user_id_,
-            int32_t pos_x_, int32_t pos_y_, int32_t pos_z_, 
-            int32_t width_, int32_t height_, bool is_visible_) = 0;
+        virtual int SetMergeStreamLayout(
+            const std::string& user_id_,
+            int pos_x_, 
+            int pos_y_, 
+            int pos_z_, 
+            int width_, 
+            int height_, 
+            bool hide_video_,
+            bool mute_audio_
+        ) = 0;
 
         /** Stop merge streams, administrator must call this interface before leave the room
         * @return return 0 if success or an error code
         */
-        virtual int32_t StopMergeStream() = 0;
+        virtual int StopMergeStream() = 0;
 
     protected:
         virtual ~QNRTCRoom() {}

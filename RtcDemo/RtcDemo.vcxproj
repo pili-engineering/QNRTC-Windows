@@ -113,9 +113,9 @@
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <PostBuildEvent>
-      <Command>copy $(ProjectDir)$(Configuration)\$(TargetFileName) $(ProjectDir)..\bin
+      <Command>copy $(SolutionDir)$(Configuration)\$(TargetFileName) $(ProjectDir)..\bin
 
-copy $(ProjectDir)$(Configuration)\$(TargetName).pdb $(ProjectDir)..\bin</Command>
+copy $(SolutionDir)$(Configuration)\$(TargetName).pdb $(ProjectDir)..\bin</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -204,6 +204,7 @@ copy $(SolutionDir)$(Configuration)\$(TargetFileName) $(SolutionDir)..\bin
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="charactor_convert.h" />
     <ClInclude Include="minidump.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="RtcDemo.h" />
