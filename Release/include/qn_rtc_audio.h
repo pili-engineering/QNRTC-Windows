@@ -13,7 +13,7 @@ namespace qiniu
             wdt_DefaultCommunicationDevice = -1,
             wdt_DefaultDevice = -2
         };
-        uint16_t            device_index;   //speaker or playout device index
+        unsigned int        device_index;   //speaker or playout device index
         WindowsDeviceType   device_type = wdt_DefaultDevice;
     }AudioDeviceSetting;
 
@@ -23,10 +23,10 @@ namespace qiniu
     enum AudioDeviceState
     {
         ads_active      = 0x00000001,     //new audio device is activated
-        ads_disabled    = 0x00000002,   //the audio device is disabled
-        ads_notpresent  = 0x00000004, //the audio device is not present
-        ads_unplugged   = 0x00000008,  //the audio device is unplugged
-        ads_MASK_ALL    = 0x0000000F,   //includes all states: active, disabled, not present, and unplugged
+        ads_disabled    = 0x00000002,     //the audio device is disabled
+        ads_notpresent  = 0x00000004,     //the audio device is not present
+        ads_unplugged   = 0x00000008,     //the audio device is unplugged
+        ads_MASK_ALL    = 0x0000000F,     //includes all states: active, disabled, not present, and unplugged
     };
 
     /**
@@ -40,7 +40,7 @@ namespace qiniu
             adt_record,
             adt_playout,
         };
-        uint32_t        device_index;
+        unsigned int    device_index;
         AudioDeviceType device_type               = adt_invalid;
         char device_name[QNRTC_MAX_DEVICE_LENGHT] = { 0 };
         char device_id[QNRTC_MAX_DEVICE_LENGHT]   = { 0 };
@@ -84,14 +84,18 @@ namespace qiniu
             * @param [in] number_of_channels_
             *        audio channels number
             * @param [in] number_of_frames_
-            *        how many audio samples are included in the data.
+            *        how many audio samples are included in the data
             * @param [in] user_id_
-            *        user id of this audio source
+            *        user id of this audio source, if empty, data after mixing
             */
             virtual void OnAudioPCMFrame(
-                const void* audio_data_, int bits_per_sample_,
-                int sample_rate_, size_t number_of_channels_, 
-                size_t number_of_frames_, const std::string& user_id_) = 0;
+                const unsigned char* audio_data_,
+                int bits_per_sample_,
+                int sample_rate_, 
+                size_t number_of_channels_, 
+                size_t number_of_frames_, 
+                const std::string& user_id_
+            ) = 0;
 
             /** Audio device plug-in event notification
             * @param [in] device_state_
@@ -100,7 +104,9 @@ namespace qiniu
             *        audio device guid 
             */
             virtual void OnAudioDeviceStateChanged(
-                AudioDeviceState device_state_, const std::string& device_guid_) = 0;
+                AudioDeviceState device_state_, 
+                const std::string& device_guid_
+            ) = 0;
 
         protected:
             virtual ~QNRTCAudioListener() {}
@@ -111,7 +117,7 @@ namespace qiniu
         *        audio device type: recording or playout
         * @return the number of designated device, if failed, return -1
         */
-        virtual int32_t GetAudioDeviceCount(AudioDeviceInfo::AudioDeviceType device_type_) = 0;
+        virtual int GetAudioDeviceCount(AudioDeviceInfo::AudioDeviceType device_type_) = 0;
         
         /** Get specified playout device information
         * @param [in] device_type_
@@ -122,9 +128,11 @@ namespace qiniu
         *        if success, device information will be copied into this parameter
         * @return return 0 if success or an error code
         */
-        virtual int32_t GetAudioDeviceInfo(
-            AudioDeviceInfo::AudioDeviceType device_type_, uint32_t device_index_, 
-            __out AudioDeviceInfo& audio_info_) = 0;
+        virtual int GetAudioDeviceInfo(
+            AudioDeviceInfo::AudioDeviceType device_type_,
+            unsigned int device_index_,
+            __out AudioDeviceInfo& audio_info_
+            ) = 0;
 
         /** Set the audio module event listener interface, you must set it to nullptr
         *   before exiting the room
@@ -184,6 +192,44 @@ namespace qiniu
         * @return return device mute flag
         */
         virtual bool GetAudioMuteFlag(AudioDeviceInfo::AudioDeviceType device_type_) = 0;
+
+        /** Enable or disable external data import feature
+        * @param [in] enable_flag_
+        *        true:enable, false:disable;
+        * @return return 0 if success or an error code
+        * @brief developer must call this method before InputAudioFrame
+        */
+        virtual int EnableAudioFakeInput(bool enable_flag_) = 0;
+
+        /** Import audio frame data when external data import feature enabled
+        * @param [in] audio_data_
+        *        audio frame data pointer
+        * @param [in] data_size_
+        *        audio frame data size
+        * @param [in] bits_per_sample_
+        *        how many bits contained per sample, current only supported 16 bits per sample
+        * @param [in] sample_rate_
+        *        audio sample rate, unit: HZ
+        * @param [in] number_of_channels_
+        *        audio channels number, current only supported mono and stereo channels
+        * @param [in] number_of_frames_
+        *        how many audio samples are included in the data.
+        * @return return 0 if success or an error code
+        * @brief developer must call EnableAudioFakeInput(true) first
+        */
+        virtual int InputAudioFrame(
+            const unsigned char* audio_data_,
+            unsigned int data_size_,
+            unsigned int bits_per_sample_,
+            unsigned int sample_rate_,
+            unsigned int number_of_channels_,
+            unsigned int number_of_frames_
+        ) = 0;
+
+        /** Whether enabled audio fake input future
+        * @return true: enable, false: disable
+        */
+        virtual bool IsEnableAudioFakeInput() = 0;
 
     protected:
         virtual ~QNRTCAudio() {}

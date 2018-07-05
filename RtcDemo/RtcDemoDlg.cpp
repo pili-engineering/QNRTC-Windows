@@ -5,6 +5,7 @@
 #include "RtcDemoDlg.h"
 #include <future>
 #include <fstream>
+#include <chrono>
 #include "afxdialogex.h"
 #include "charactor_convert.h"
 #include "qn_rtc_engine.h"
@@ -92,6 +93,10 @@ BEGIN_MESSAGE_MAP(CRtcDemoDlg, CDialogEx)
     ON_BN_CLICKED(IDC_CHECK_MUTE_VIDEO, &CRtcDemoDlg::OnBnClickedCheckMuteVideo)
     ON_CBN_SELCHANGE(IDC_COMBO_PLAYOUT, &CRtcDemoDlg::OnCbnSelchangeComboPlayout)
     ON_WM_TIMER()
+    ON_BN_CLICKED(IDC_BTN_FLUSH, &CRtcDemoDlg::OnBnClickedBtnFlush)
+    ON_BN_CLICKED(IDC_CHECK_ACTIVE_SCREEN, &CRtcDemoDlg::OnBnClickedCheckActiveScreen)
+    ON_CBN_SELCHANGE(IDC_COMBO_SCREEN, &CRtcDemoDlg::OnCbnSelchangeComboScreen)
+    ON_BN_CLICKED(IDC_CHECK_DX, &CRtcDemoDlg::OnBnClickedCheckDx)
 END_MESSAGE_MAP()
 
 // CRtcDemoDlg message handlers
@@ -167,6 +172,9 @@ BOOL CRtcDemoDlg::OnInitDialog()
     //  when the application's main window is not a dialog
     SetIcon(m_hIcon, TRUE);     // Set big icon
     SetIcon(m_hIcon, FALSE);    // Set small icon
+    
+    // 默认选中 DirectX，即屏幕抓取时默认使用 DX
+    ((CButton *)GetDlgItem(IDC_CHECK_DX))->SetCheck(1);
 
     // Init Status Bar
     InitStatusBar();
@@ -246,6 +254,9 @@ BOOL CRtcDemoDlg::OnInitDialog()
     ((CSliderCtrl*)GetDlgItem(IDC_SLIDER_RECORD))->SetPos(255);
     ((CSliderCtrl*)GetDlgItem(IDC_SLIDER_PLAYOUT))->SetRange(0, 255);
     ((CSliderCtrl*)GetDlgItem(IDC_SLIDER_PLAYOUT))->SetPos(255);
+
+    // 初始化屏幕录制窗口列表
+    OnBnClickedBtnFlush();
 
     return TRUE;  // return TRUE  unless you set the focus to a control
 }
@@ -373,6 +384,7 @@ void CRtcDemoDlg::OnJoinResult(int error_code_, const std::string& error_str_,
                 OnRemotePublish(itor.user_id, itor.video_published, itor.audio_published);
             }
         }
+
         // 记录开始连麦的系统时间，并开启定时器
         _start_time = chrono::system_clock::now();
         SetTimer(UPDATE_TIME_TIMER_ID, 1000, nullptr);
@@ -577,7 +589,7 @@ void CRtcDemoDlg::OnLocalPublishResult(int error_code_, const std::string& error
             ((CButton *)GetDlgItem(IDC_CHECK_MUTE_VIDEO))->SetCheck(0);
             if (_contain_admin_flag) {
                 _rtc_room_interface->SetMergeStreamLayout(
-                    unicode2utf(_user_id.GetBuffer()), 0, 0, 0, Canvas_Width, Canvas_Height, true);
+                    unicode2utf(_user_id.GetBuffer()), 0, 0, 0, Canvas_Width, Canvas_Height, true, false);
             }
             _wndStatusBar.SetText(_T("本地流发布成功！"), 1, 0);
         });
@@ -695,7 +707,7 @@ void CRtcDemoDlg::OnStatisticsUpdated(const StatisticsReport& statistics_)
     TRACE(utf2unicode(dest_buf).c_str());
 }
 
-void CRtcDemoDlg::OnAudioPCMFrame(const void* audio_data_,
+void CRtcDemoDlg::OnAudioPCMFrame(const unsigned char* audio_data_,
     int bits_per_sample_, int sample_rate_, size_t number_of_channels_,
     size_t number_of_frames_, const std::string& user_id_)
 {
@@ -721,7 +733,8 @@ void CRtcDemoDlg::OnAudioDeviceStateChanged(
 }
 
 void CRtcDemoDlg::OnVideoFrame(const unsigned char* raw_data_,
-    int data_len_, qiniu::VideoCaptureType video_type_, const std::string& user_id_)
+    int data_len_, int width_, int height_, 
+    qiniu::VideoCaptureType video_type_, const std::string& user_id_)
 {
 
 }
@@ -795,6 +808,10 @@ void CRtcDemoDlg::OnBnClickedButtonJoin()
         });
     } else {
         // LeaveRoom
+        if (_fake_video_thread.joinable()) {
+            _stop_fake_flag = true;
+            _fake_video_thread.join();
+        }
         if (_contain_admin_flag) {
             _rtc_room_interface->StopMergeStream();
         }
@@ -816,20 +833,27 @@ void CRtcDemoDlg::OnBnClickedButtonPublish()
     CString str;
     GetDlgItemText(IDC_BUTTON_PUBLISH, str);
     if (0 == str.CompareNoCase(_T("发布"))) {
-        CString video_dev_name;
-        string video_dev_id;
-        int audio_recorder_device_index(-1);
-        int audio_playout_device_index(-1);
         bool enable_audio, enable_video;
-
-        GetDlgItem(IDC_COMBO_CAMERA)->GetWindowTextW(video_dev_name);
-        audio_recorder_device_index = ((CComboBox *)GetDlgItem(IDC_COMBO_MICROPHONE))->GetCurSel();
-        audio_playout_device_index = ((CComboBox *)GetDlgItem(IDC_COMBO_PLAYOUT))->GetCurSel();
         enable_audio =
             (BST_CHECKED == ((CButton *)GetDlgItem(IDC_CHECK_ENABLE_AUDIO))->GetCheck()) ? true : false;
         enable_video =
             (BST_CHECKED == ((CButton *)GetDlgItem(IDC_CHECK_ENABLE_VIDEO))->GetCheck()) ? true : false;
 
+#ifdef RTN_FAKE_CAPTURE // 模拟导入外部数据
+        ImportExternalRawFrame();
+#else
+        CString video_dev_name;
+        string video_dev_id;
+        int audio_recorder_device_index(-1);
+        int audio_playout_device_index(-1);
+
+        GetDlgItem(IDC_COMBO_CAMERA)->GetWindowTextW(video_dev_name);
+        audio_recorder_device_index = ((CComboBox *)GetDlgItem(IDC_COMBO_MICROPHONE))->GetCurSel();
+        audio_recorder_device_index = (audio_recorder_device_index == CB_ERR) ? 0 : audio_recorder_device_index;
+
+        audio_playout_device_index = ((CComboBox *)GetDlgItem(IDC_COMBO_PLAYOUT))->GetCurSel();
+        audio_playout_device_index = (audio_playout_device_index == CB_ERR) ? 0 : audio_playout_device_index;
+        
         if (video_dev_name.IsEmpty()) {
             MessageBox(_T("您当前没有任何视频设备！"));
             return;
@@ -855,23 +879,23 @@ void CRtcDemoDlg::OnBnClickedButtonPublish()
         camera_setting.bitrate     = 500000;
         _rtc_room_interface->ObtainVideoInterface()->SetCameraParams(camera_setting);
 
-        /* 如果没有音频输入设备，则不发布音频 */
-        if (audio_recorder_device_index >= 0) {
-            AudioDeviceSetting audio_setting;
-            audio_setting.device_index = audio_recorder_device_index;
-            audio_setting.device_type = qiniu::AudioDeviceSetting::wdt_DefaultDevice;
-            if (0 != _rtc_audio_interface->SetRecordingDevice(audio_setting)) {
-                std::thread([this] {
-                    MessageBox(_T("设置音频输入设备失败，应用程序将继续连麦，但不再发布音频流！"));
-                }).detach();
-                audio_recorder_device_index = -1;
-                _wndStatusBar.SetText(_T("设置音频输入设备失败，应用程序将继续连麦，但不再发布音频流！"), 1, 0);
-            }
-        } else {
-            _wndStatusBar.SetText(_T("您当前没有任何音频输入设备，将仅发布视频流！"), 1, 0);
-        }
         if (enable_audio) {
             enable_audio = (audio_recorder_device_index < 0) ? false : true;
+            /* 如果没有音频输入设备，则不发布音频 */
+            if (audio_recorder_device_index >= 0) {
+                AudioDeviceSetting audio_setting;
+                audio_setting.device_index = audio_recorder_device_index;
+                audio_setting.device_type = qiniu::AudioDeviceSetting::wdt_DefaultDevice;
+                if (0 != _rtc_audio_interface->SetRecordingDevice(audio_setting)) {
+                    std::thread([this] {
+                        MessageBox(_T("设置音频输入设备失败，应用程序将继续连麦，但不再发布音频流！"));
+                    }).detach();
+                    audio_recorder_device_index = -1;
+                    _wndStatusBar.SetText(_T("设置音频输入设备失败，应用程序将继续连麦，但不再发布音频流！"), 1, 0);
+                }
+            } else {
+                _wndStatusBar.SetText(_T("您当前没有任何音频输入设备，将仅发布视频流！"), 1, 0);
+            }
         }
 
         if (!enable_audio && !enable_video) {
@@ -879,9 +903,16 @@ void CRtcDemoDlg::OnBnClickedButtonPublish()
             MessageBox(_T("不能同时不发布音、视频！"));
             return;
         }
-
+#endif // RTN_FAKE_CAPTURE
         _rtc_room_interface->Publish(enable_audio, enable_video);
     } else {
+        _stop_fake_flag = true;
+        if (_fake_video_thread.joinable()) {
+            _fake_video_thread.join();
+        }
+        if (_fake_audio_thread.joinable()) {
+            _fake_audio_thread.join();
+        }
         if (_contain_admin_flag) {
             _rtc_room_interface->StopMergeStream();
         }
@@ -898,7 +929,13 @@ void CRtcDemoDlg::OnBnClickedButtonPublish()
 void CRtcDemoDlg::OnDestroy()
 {
     KillTimer(UPDATE_TIME_TIMER_ID);
-
+    _stop_fake_flag = true;
+    if (_fake_video_thread.joinable()) {
+        _fake_video_thread.join();
+    }
+    if (_fake_audio_thread.joinable()) {
+        _fake_audio_thread.join();
+    }
     _user_stream_map.clear();
     if (_join_room_thread.joinable()) {
         _join_room_thread.join();
@@ -950,6 +987,11 @@ void CRtcDemoDlg::OnBnClickedButtonPreview()
         return;
     }
     CString str;
+    GetDlgItemText(IDC_BUTTON_PUBLISH, str);
+    if (0 == str.CompareNoCase(_T("取消发布"))) {
+        MessageBox(_T("发布中，不能预览！"));
+        return;
+    }
     GetDlgItemText(IDC_BUTTON_PREVIEW_VIDEO, str);
     if (0 == str.CompareNoCase(_T("预览"))) {
         CString cur_dev_name;
@@ -1242,7 +1284,8 @@ void CRtcDemoDlg::AdjustMergeStreamPosition()
                         pos_num, 
                         Canvas_Width / 3, 
                         Canvas_Height / 3, 
-                        true);
+                        true,
+                        false);
                 }
             }
         }
@@ -1286,12 +1329,103 @@ void CRtcDemoDlg::WriteConfigFile()
 void CRtcDemoDlg::InitStatusBar()
 {
     _wndStatusBar.Create(WS_CHILD | WS_VISIBLE | SBT_OWNERDRAW, CRect(0, 0, 0, 0), this, 0);
-    int strPartDim[3] = { 200, 1150, -1 };
+    int strPartDim[3] = { 300, 1000, -1 };
     _wndStatusBar.SetParts(3, strPartDim);
     //设置状态栏文本  
     _wndStatusBar.SetText(_T("通话时长：00:00::00"), 0, 0);
     _wndStatusBar.SetText(_T("连麦状态"), 1, 0);
     _wndStatusBar.SetText(utf2unicode(GetAppVersion()).c_str(), 2, 0);
+}
+
+void CRtcDemoDlg::ImportExternalRawFrame()
+{
+    // 模拟导入视频数据
+    _rtc_video_interface->EnableVideoFakeCamera(true);
+    CameraSetting cs;
+    cs.width = 1280;
+    cs.height = 960;
+    cs.max_fps = 15;
+    cs.bitrate = 2000000;
+    cs.render_hwnd = GetDlgItem(IDC_STATIC_VIDEO_PREVIEW)->m_hWnd;
+    _rtc_video_interface->SetCameraParams(cs);
+    if (_fake_video_thread.joinable()) {
+        _stop_fake_flag = true;
+        _fake_video_thread.join();
+    }
+    _fake_video_thread = thread([&] {
+        FILE* fp = nullptr;
+        fopen_s(&fp, "yuv.yuv", "rb");
+        uint8_t *buf = (uint8_t*)malloc(640 * 480 * 3 / 2);
+        if (!fp || !buf) {
+            MessageBox(_T("Raw data 文件打开失败，请确认此文件件是否存在!"));
+            return;
+        }
+        size_t ret(0);
+        _stop_fake_flag = false;
+        chrono::system_clock::time_point start_tp = chrono::system_clock::now();
+        while (!_stop_fake_flag) {
+            ret = fread_s(buf, 640 * 480 * 3 / 2, 1, 640 * 480 * 3 / 2, fp);
+            if (ret > 0) {
+                _rtc_video_interface->InputVideoFrame(
+                    buf,
+                    640 * 480 * 3 / 2,
+                    640,
+                    480,
+                    chrono::duration_cast<chrono::microseconds>(chrono::system_clock::now() - start_tp).count(),
+                    qiniu::VideoCaptureType::kI420,
+                    qiniu::kVideoRotation_180);
+            } else {
+                fseek(fp, 0, SEEK_SET);
+                continue;
+            }
+            this_thread::sleep_for(chrono::milliseconds(1000 / 15)); // 15 fps
+        }
+        free(buf);
+        fclose(fp);
+    });
+
+    // 模拟导入音频数据
+    _rtc_audio_interface->EnableAudioFakeInput(true);
+    if (_fake_audio_thread.joinable()) {
+        _stop_fake_flag = true;
+        _fake_audio_thread.join();
+    }
+    _fake_audio_thread = thread([&] {
+        FILE* fp = nullptr;
+        fopen_s(&fp, "pcm_mic_480_16_2.pcm", "rb");
+        uint8_t *buf = (uint8_t*)malloc(480 * 2 * 2);
+        if (!fp || !buf) {
+            MessageBox(_T("PCM 文件打开失败，请确认此文件件是否存在!"));
+            return;
+        }
+        size_t ret(0);
+        _stop_fake_flag = false;
+        chrono::system_clock::time_point start_tp = chrono::system_clock::now();
+        while (!_stop_fake_flag) {
+            if (chrono::duration_cast<chrono::milliseconds>(chrono::system_clock::now() - start_tp).count() >= 9) {
+                start_tp = chrono::system_clock::now();
+            } else {
+                this_thread::sleep_for(chrono::milliseconds(1));
+                continue;
+            }
+            ret = fread_s(buf, 480 * 4, 1, 480 * 4, fp);
+            if (ret >= 480 * 4) {
+                _rtc_audio_interface->InputAudioFrame(
+                    buf,
+                    480 * 4,
+                    16,
+                    48000,
+                    2,
+                    480
+                );
+            } else {
+                fseek(fp, 0, SEEK_SET);
+                continue;
+            }
+        }
+        free(buf);
+        fclose(fp);
+    });
 }
 
 void CRtcDemoDlg::OnTimer(UINT_PTR nIDEvent)
@@ -1324,4 +1458,65 @@ void CRtcDemoDlg::OnTimer(UINT_PTR nIDEvent)
         }
         AdjustRenderWndPos();
     }
+}
+
+void CRtcDemoDlg::OnBnClickedBtnFlush()
+{
+    // TODO: Add your control notification handler code here
+    if (!_rtc_video_interface) {
+        return;
+    }
+    ((CComboBox *)GetDlgItem(IDC_COMBO_SCREEN))->ResetContent();
+    _screen_wnd_map.clear();
+    int count = _rtc_video_interface->GetScreenWindowCount();
+    for (int i(0); i < count; ++i) {
+        ScreenWindowInfo info = _rtc_video_interface->GetScreenWindowInfo(i);
+        _screen_wnd_map[info.id] = info;
+        ((CComboBox *)GetDlgItem(IDC_COMBO_SCREEN))->AddString(
+            utf2unicode(info.title).c_str()
+        );
+    }
+    ((CComboBox *)GetDlgItem(IDC_COMBO_SCREEN))->SetCurSel(0);
+}
+
+void CRtcDemoDlg::OnBnClickedCheckActiveScreen()
+{
+    // 判断是否激活了屏幕录制
+    if (!_rtc_video_interface) {
+        return;
+    }
+    CString wnd_title;
+    GetDlgItem(IDC_COMBO_SCREEN)->GetWindowTextW(wnd_title);
+    int screencasts_state = ((CButton *)GetDlgItem(IDC_CHECK_ACTIVE_SCREEN))->GetCheck();
+    int directx_state     = ((CButton *)GetDlgItem(IDC_CHECK_DX))->GetCheck();
+    if (screencasts_state == 1) {
+        for (auto&& itor : _screen_wnd_map) {
+            if (itor.second.title.compare(unicode2utf(wnd_title.GetBuffer())) == 0) {
+                _rtc_video_interface->EnableAndSetScreenSourceId(
+                    itor.first, 
+                    directx_state?true:false
+                );
+                break;
+            }
+        }
+    } else {
+        // 关闭屏幕共享
+        _rtc_video_interface->EnableAndSetScreenSourceId(
+            -1, 
+            directx_state ? true : false
+        );
+    }
+}
+
+void CRtcDemoDlg::OnCbnSelchangeComboScreen()
+{
+    // TODO: Add your control notification handler code here
+    OnBnClickedCheckActiveScreen();
+}
+
+
+void CRtcDemoDlg::OnBnClickedCheckDx()
+{
+    // TODO: Add your control notification handler code here
+    OnBnClickedCheckActiveScreen();
 }

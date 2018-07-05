@@ -57,15 +57,16 @@ protected:
 
     // Implementation QNRTCAudioListener
     void OnAudioPCMFrame(
-        const void* audio_data_, int bits_per_sample_,
+        const unsigned char* audio_data_, int bits_per_sample_,
         int sample_rate_, size_t number_of_channels_,
         size_t number_of_frames_, const std::string& user_id_) override;
     void OnAudioDeviceStateChanged(
         AudioDeviceState new_device_state_, const std::string& device_guid_) override;
 
     // Implementation QNRTCVideoListener
-    void OnVideoFrame(const unsigned char* raw_data_, 
-        int data_len_, qiniu::VideoCaptureType video_type_, const std::string& user_id_) override;
+    void OnVideoFrame(const unsigned char* raw_data_, int data_len_, 
+        int width_, int height_, qiniu::VideoCaptureType video_type_, const std::string& user_id_
+    ) override;
     void OnVideoDeviceStateChanged(
         VideoDeviceState new_device_state_, const std::string& device_id_) override;
 
@@ -89,6 +90,10 @@ protected:
     afx_msg void OnBnClickedCheckMuteVideo();
     afx_msg void OnCbnSelchangeComboPlayout();
     afx_msg void OnTimer(UINT_PTR nIDEvent);
+    afx_msg void OnBnClickedBtnFlush();
+    afx_msg void OnBnClickedCheckActiveScreen();
+    afx_msg void OnCbnSelchangeComboScreen();
+    afx_msg void OnBnClickedCheckDx();
 
     virtual BOOL PreTranslateMessage(MSG* pMsg);
 
@@ -105,14 +110,17 @@ protected:
     std::tuple<int, int> FindBestVideoSize(const CameraCapabilityVec& camera_cap_vec_);
 
     // 每次远端用户发布，或取消发布后，重新调整下合流参数的配置
-    void        AdjustMergeStreamPosition();
+    void         AdjustMergeStreamPosition();
 
     // 房间名、用户 ID 配置文件的读取和写入
-    void        ReadConfigFile();
-    void        WriteConfigFile();
+    void         ReadConfigFile();
+    void         WriteConfigFile();
 
     // 初始化界面下方的状态条
-    void        InitStatusBar();
+    void         InitStatusBar();
+
+    // 导入外部音视频数据，注：数据源需要自己准备 
+    void         ImportExternalRawFrame();
 
 private:
     typedef struct _TUserStreamInfo
@@ -150,4 +158,9 @@ private:
     list<std::function<void()>>     _call_function_vec;
     bool                            _contain_admin_flag  = false;
     chrono::time_point<chrono::system_clock> _start_time;      // joined room time point
+    thread                          _fake_video_thread;
+    thread                          _fake_audio_thread;
+    atomic_bool                     _stop_fake_flag = false;
+    unordered_map<int, ScreenWindowInfo>      
+                                    _screen_wnd_map;           // screen windows map, key:source id
 };

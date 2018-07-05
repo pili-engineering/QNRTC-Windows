@@ -173,4 +173,7 @@ namespace qiniu
 
 /* Connect server to get accesstoken timeout */
 #define Err_Get_AccessToken_Timeout 11040
+
+/* Video capture module not running*/
+#define Err_VideoCapture_Not_Running 11050
 }
