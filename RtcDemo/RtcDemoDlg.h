@@ -67,6 +67,8 @@ protected:
     void OnVideoFrame(const unsigned char* raw_data_, int data_len_, 
         int width_, int height_, qiniu::VideoCaptureType video_type_, const std::string& user_id_
     ) override;
+    void OnVideoFramePreview(const unsigned char* raw_data_, int data_len_,
+        int width_, int height_, qiniu::VideoCaptureType video_type_);
     void OnVideoDeviceStateChanged(
         VideoDeviceState new_device_state_, const std::string& device_id_) override;
 
@@ -94,6 +96,8 @@ protected:
     afx_msg void OnBnClickedCheckActiveScreen();
     afx_msg void OnCbnSelchangeComboScreen();
     afx_msg void OnBnClickedCheckDx();
+    afx_msg void OnBnClickedButtonPreviewScreen();
+    afx_msg void OnBnClickedCheckImportRawData();
 
     virtual BOOL PreTranslateMessage(MSG* pMsg);
 
@@ -117,10 +121,14 @@ protected:
     void         WriteConfigFile();
 
     // 初始化界面下方的状态条
-    void         InitStatusBar();
+    void         InitDemoUI();
 
     // 导入外部音视频数据，注：数据源需要自己准备 
     void         ImportExternalRawFrame();
+
+    void         InsertMsgEditText(LPCTSTR msg_);
+
+    std::function<void()> GetFunc();
 
 private:
     typedef struct _TUserStreamInfo
@@ -133,6 +141,7 @@ private:
         bool   is_subscribed   = false;   //是否已经被订阅 
         shared_ptr<CStatic> render_wnd_ptr   = nullptr;
         shared_ptr<CStatic> display_name_ptr = nullptr;
+        shared_ptr<CProgressCtrl> volume_ptr = nullptr;
     }UserStreamInfo;
 
     const int Canvas_Width  = 480;        // 合流的默认画布宽度，可由服务端进行配置 
@@ -151,6 +160,7 @@ private:
     map<string, string>             _playout_dev_map;          // key:device id; value:device name
     bool                            _publish_flag        = false;
     thread                          _join_room_thread;         // temporary thread handle that asynchronously join room
+    CString                         _app_id;
     CString                         _room_name;
     CString                         _user_id;
     string                          _room_token;
@@ -163,4 +173,6 @@ private:
     atomic_bool                     _stop_fake_flag = false;
     unordered_map<int, ScreenWindowInfo>      
                                     _screen_wnd_map;           // screen windows map, key:source id
+    CRichEditCtrl                   _msg_rich_edit_ctrl;       // 系统消息展示控件
+    CProgressCtrl                   _local_volume_progress;    // 用于展示本地麦克风音量条
 };

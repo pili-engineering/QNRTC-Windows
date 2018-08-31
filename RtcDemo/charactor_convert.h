@@ -19,7 +19,7 @@ inline wstring utf2unicode(string str)
     buffer[len]='\0';//添加字符串结尾
     //删除缓冲区并返回值 
     wstring return_value;
-    return_value.append(buffer);
+    return_value.assign(buffer, len);
     delete []buffer;
     return return_value;
 }
@@ -37,7 +37,7 @@ inline string unicode2utf(wstring str)
     WideCharToMultiByte(CP_ACP,0,str.c_str(),str.size(),buffer,len,NULL,NULL);
     buffer[len]='\0';
     //删除缓冲区并返回值 
-    return_value.append(buffer);
+    return_value.assign(buffer, len);
     delete []buffer;
     return return_value;
 }
