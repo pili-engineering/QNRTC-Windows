@@ -53,7 +53,7 @@ namespace qiniu
             return *this;
         }
     }AudioDeviceInfo;
-
+    
     typedef std::vector<AudioDeviceInfo> AudioDeviceInfoVec;
 
     /*!
@@ -161,21 +161,30 @@ namespace qiniu
         */
         virtual int SetPlayoutDevice(AudioDeviceSetting playout_device_setting_) = 0;
         
-        /** Get audio volume
+        /** Get system audio volume
         * @param [in] device_type_
         *        audio device type: recording or playout
-        * @return return audio volume: 0 ~ 255
+        * @return return audio volume: 0 ~ 100
         */
         virtual int GetAudioVolume(AudioDeviceInfo::AudioDeviceType device_type_) = 0;
 
-        /** Set recording volume
+        /** Set system volume
         * @param [in] device_type_
         *        audio device type: recording or playout
         * @param [in] volume_
-        *        audio volume
+        *        audio volume : 0 ~ 100
         * @return return 0 if success or an error code
         */
         virtual int SetAudioVolume(AudioDeviceInfo::AudioDeviceType device_type_, int volume_) = 0;
+
+        /** Set the volume of a specified user
+        * @param [in] user_id_
+        *        user id
+        * @param [in] volume_
+        *        audio volume, 0 ~ 100
+        * @return return 0 if success or an error code
+        */
+        virtual int SetAudioVolume(const std::string& user_id_, double volume_) = 0;
 
         /** Set recording mute flag
         * @param [in] device_type_
@@ -231,6 +240,13 @@ namespace qiniu
         */
         virtual bool IsEnableAudioFakeInput() = 0;
 
+        /** Get audio level 
+        * @param [in] user_id_
+        *        who's audio level
+        * @return 0 ~ 100£¬audio level >= 0 if success, else return -1
+        */
+        virtual unsigned int GetAudioLevel(const std::string& user_id_) = 0;
+        
     protected:
         virtual ~QNRTCAudio() {}
     };

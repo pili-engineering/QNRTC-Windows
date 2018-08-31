@@ -176,4 +176,13 @@ namespace qiniu
 
 /* Video capture module not running*/
 #define Err_VideoCapture_Not_Running 11050
+
+/* Create offer sdp failed*/
+#define Err_CreateOffer_Failed 11060
+
+/* recording not started*/
+#define Err_Record_Not_Start 11061
+
+/* Resample failed*/
+#define Err_Internal_Resamle_Failed 11062
 }

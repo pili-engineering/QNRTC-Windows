@@ -124,8 +124,6 @@ namespace qiniu
             *        video frame height
             * @param [in] video_type_
             *        video frame raw data format
-            * @param [in] stream_id_ 
-            *        stream id of this video source
             * @param [in] user_id_
             *        user id of this video source 
             */
@@ -137,6 +135,26 @@ namespace qiniu
                 qiniu::VideoCaptureType video_type_, 
                 const std::string& user_id_
             ) = 0;
+
+            /** Video frames callback when preview local camera
+            * @param [in] raw_data_
+            *        pointer to video frame data
+            * @param [in] data_len_
+            *        video frame data size
+            * @param [in] width_
+            *        video frame width
+            * @param [in] height_
+            *        video frame height
+            * @param [in] video_type_
+            *        video frame raw data format
+            */
+            virtual void OnVideoFramePreview(
+                const unsigned char* raw_data_,
+                int data_len_,
+                int width_,
+                int height_,
+                qiniu::VideoCaptureType video_type_
+            ) {};
 
             /** Video device plug-in event notification,only for devices in use
             * @param [in] device_state_
@@ -186,6 +204,7 @@ namespace qiniu
         virtual int SetCameraParams(CameraSetting& camera_setting_) = 0;
 
         /** Preview the camera by specified params
+        *   video frames data callback through QNRTCVideoListener::OnVideoFramePreview
         * @param [in out] camera_setting_
         *        set the camera params previewed, if the camera not support those params,
         *        it will output the most similar params and publish
@@ -270,12 +289,34 @@ namespace qiniu
         */
         virtual int GetScreenSourceId() = 0;
 
+        /** Preview specify screen or window source id
+        *   video frames data callback through QNRTCVideoListener::OnVideoFramePreview
+        * @param [in] source_id_
+        *        screen window source id, obtain by method:GetScreenWindowInfo
+        * @param [in] render_hwnd_
+        *        video render window hwnd,MFC:HWND; QT:winId
+        * @param [in] allow_directx_capturer_
+        *        allowing directx based capturer or not, this capturer works on windows 7
+        *        with platform update / windows 8 or upper.
+        * @return return 0 if success, or an error code
+        */
+        virtual int PreviewScreenSource(
+            const int& source_id_, 
+            void* render_hwnd_, 
+            bool allow_directx_capturer_ = false
+        ) = 0;
+
+        /** Cancel preview screen source
+        * @return return 0 if success or an error code
+        */
+        virtual int UnPreviewScreenSource() = 0;
+
         /** Mirroring the specified user, mirror = left and right rotation
         * @param [in] user_id_
         *        specified user id
         * @param [in] mirror_flag_
         *        mirror flag, true or false
-        * @return is set success
+        * @return return 0 if success, or an error code
         */
         virtual int SetMirrorWhenDisplay(const std::string& user_id_, bool mirror_flag_) = 0;
         

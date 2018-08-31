@@ -40,7 +40,7 @@ CRtcDemoApp theApp;
 
 BOOL CRtcDemoApp::InitInstance()
 {
-    InitMinDump();
+// TODO: call AfxInitRichEdit2() to initialize richedit2 library.\n"    InitMinDump();
 
 	// InitCommonControlsEx() is required on Windows XP if an application
 	// manifest specifies use of ComCtl32.dll version 6 or later to enable
@@ -52,8 +52,8 @@ BOOL CRtcDemoApp::InitInstance()
 	InitCtrls.dwICC = ICC_WIN95_CLASSES;
 	InitCommonControlsEx(&InitCtrls);
 
+    AfxInitRichEdit2();
 	CWinApp::InitInstance();
-
 
 	// Create the shell manager, in case the dialog contains
 	// any shell tree view or shell list view controls.
