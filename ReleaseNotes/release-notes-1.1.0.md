@@ -31,6 +31,5 @@ QNRTCWin 是七牛云推出的一款适用于 Windows 平台的实时音视频 S
 - 新版本 SDK 新增对 libcurl.dll （支持 SSL）的依赖，如果与开发者使用的 libcurl 动态库产生冲突，则开发者可以直接使用本 SDK 依赖的 libcurl，其 lib 和 接口头文件均存放在 Demo 源码中的 `thirdpart/libcurl` 中，[Demo GitHub 地址](https://github.com/pili-engineering/QNRTC-Windows)。
 
 ## 问题反馈 
-
 当你遇到任何问题时，可以通过在 GitHub 的 repo 提交 `issues` 来反馈问题，请尽可能的描述清楚遇到的问题，如果有错误信息也一同附带，并且在 ```Labels``` 中指明类型为 bug 或者其他。 [通过这里查看已有的 issues 和提交 bug](https://github.com/pili-engineering/QNRTC-Windows)
 
