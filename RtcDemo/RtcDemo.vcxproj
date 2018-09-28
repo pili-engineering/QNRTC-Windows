@@ -204,6 +204,7 @@ copy $(SolutionDir)$(Configuration)\$(TargetFileName) $(SolutionDir)..\bin
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="CFullScreenDlg.h" />
     <ClInclude Include="charactor_convert.h" />
     <ClInclude Include="minidump.h" />
     <ClInclude Include="Resource.h" />
@@ -213,6 +214,7 @@ copy $(SolutionDir)$(Configuration)\$(TargetFileName) $(SolutionDir)..\bin
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CFullScreenDlg.cpp" />
     <ClCompile Include="RtcDemo.cpp" />
     <ClCompile Include="RtcDemoDlg.cpp" />
     <ClCompile Include="stdafx.cpp">

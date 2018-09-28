@@ -12,6 +12,7 @@
 #include "curl.h"
 #include <mmdeviceapi.h>
 #include <endpointvolume.h>
+#include "resource.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -106,6 +107,7 @@ BEGIN_MESSAGE_MAP(CRtcDemoDlg, CDialogEx)
     ON_BN_CLICKED(IDC_CHECK_DX, &CRtcDemoDlg::OnBnClickedCheckDx)
     ON_BN_CLICKED(IDC_BUTTON_PREVIEW_SCREEN, &CRtcDemoDlg::OnBnClickedButtonPreviewScreen)
     ON_BN_CLICKED(IDC_CHECK_IMPORT_RAW_DATA, &CRtcDemoDlg::OnBnClickedCheckImportRawData)
+    ON_BN_CLICKED(IDC_CHECK_DESKTOP_AUDIO, &CRtcDemoDlg::OnBnClickedCheckDesktopAudio)
 END_MESSAGE_MAP()
 
 // CRtcDemoDlg message handlers
@@ -571,7 +573,22 @@ void CRtcDemoDlg::OnRemotePublish(const std::string& user_id_, bool has_audio_, 
         itor->second.display_name_ptr->ShowWindow(SW_SHOWNORMAL);
         itor->second.render_wnd_ptr->ShowWindow(SW_SHOWNORMAL);
         itor->second.volume_ptr->ShowWindow(SW_SHOWNORMAL);
-        _rtc_room_interface->Subscribe(itor->first, itor->second.render_wnd_ptr->m_hWnd);
+
+        //if (!_full_dlg_ptr) {
+        //    _full_dlg_ptr.reset(new CFullScreenDlg, [](CFullScreenDlg* ptr_) {
+        //        if (ptr_) {
+        //            ptr_->Invalidate();
+        //            ptr_->DestroyWindow();
+        //            delete ptr_;
+        //        }
+        //    });
+        //    _full_dlg_ptr->Create(IDD_DIALOG_FULL);
+        //    _full_dlg_ptr->ShowWindow(SW_SHOWMAXIMIZED);
+        //}
+
+
+        _rtc_room_interface->Subscribe(itor->first, has_video_?itor->second.render_wnd_ptr->m_hWnd:NULL);
+        //_rtc_room_interface->Subscribe(itor->first, has_video_ ? _full_dlg_ptr->m_hWnd : NULL);
         if (_contain_admin_flag) {
             AdjustMergeStreamPosition();
         }
@@ -813,7 +830,6 @@ void CRtcDemoDlg::OnVideoFrame(const unsigned char* raw_data_,
 void CRtcDemoDlg::OnVideoFramePreview(const unsigned char* raw_data_,
     int data_len_, int width_, int height_, qiniu::VideoCaptureType video_type_)
 {
-
 }
 
 void CRtcDemoDlg::OnVideoDeviceStateChanged(
@@ -961,6 +977,7 @@ void CRtcDemoDlg::OnBnClickedButtonPublish()
             _rtc_audio_interface->EnableAudioFakeInput(false);
             _rtc_video_interface->EnableVideoFakeCamera(false);
 
+            CameraSetting camera_setting;
             CString video_dev_name;
             string video_dev_id;
             int audio_recorder_device_index(-1);
@@ -969,31 +986,41 @@ void CRtcDemoDlg::OnBnClickedButtonPublish()
             audio_recorder_device_index = ((CComboBox *)GetDlgItem(IDC_COMBO_MICROPHONE))->GetCurSel();
             audio_recorder_device_index = (audio_recorder_device_index == CB_ERR) ? 0 : audio_recorder_device_index;
 
-            if (video_dev_name.IsEmpty()) {
-                MessageBox(_T("您当前没有任何视频设备！"));
-                return;
-            }
-            auto itor = _camera_dev_map.begin();
-            while (itor != _camera_dev_map.end()) {
-                if (itor->second.device_name.compare(unicode2utf(video_dev_name.GetBuffer())) == 0) {
-                    video_dev_id = itor->first;
-                    break;
+            // 视频相关配置，摄像头 或者 屏幕分享
+            if (((CButton *)GetDlgItem(IDC_CHECK_ACTIVE_SCREEN))->GetCheck() == BST_CHECKED) {
+                OnBnClickedCheckActiveScreen();
+            } else {
+                if (video_dev_name.IsEmpty()) {
+                    if (enable_video) {
+                        MessageBox(_T("您当前没有任何视频设备！"));
+                        enable_video = false;
+                    }
                 }
-                ++itor;
-            }
-            // 获取适中的尺寸
-            auto tuple_size = FindBestVideoSize(itor->second.capability_vec);
+                if (enable_video) {
+                    auto itor = _camera_dev_map.begin();
+                    while (itor != _camera_dev_map.end()) {
+                        if (itor->second.device_name.compare(unicode2utf(video_dev_name.GetBuffer())) == 0) {
+                            video_dev_id = itor->first;
+                            break;
+                        }
+                        ++itor;
+                    }
+                    // 获取适中的尺寸
+                    auto tuple_size = FindBestVideoSize(itor->second.capability_vec);
 
-            CameraSetting camera_setting;
+                    camera_setting.device_name = unicode2utf(video_dev_name.GetBuffer());
+                    camera_setting.device_id = video_dev_id;
+                    camera_setting.width = std::get<0>(tuple_size);
+                    camera_setting.height = std::get<1>(tuple_size);
+                    camera_setting.max_fps = 15;
+                    camera_setting.bitrate = 500000;
+                }
+            }
             camera_setting.render_hwnd = GetDlgItem(IDC_STATIC_VIDEO_PREVIEW2)->m_hWnd;
-            camera_setting.device_name = unicode2utf(video_dev_name.GetBuffer());
-            camera_setting.device_id = video_dev_id;
-            camera_setting.width = std::get<0>(tuple_size);
-            camera_setting.height = std::get<1>(tuple_size);
-            camera_setting.max_fps = 15;
-            camera_setting.bitrate = 500000;
+
             _rtc_room_interface->ObtainVideoInterface()->SetCameraParams(camera_setting);
 
+            // 音频配置
             if (enable_audio) {
                 enable_audio = (audio_recorder_device_index < 0) ? false : true;
                 /* 如果没有音频输入设备，则不发布音频 */
@@ -1066,6 +1093,7 @@ void CRtcDemoDlg::OnDestroy()
         _rtc_room_interface->Release();
         _rtc_room_interface = nullptr;
     }
+
     qiniu::QNRTCEngine::Release();
 
     _user_stream_map.clear();
@@ -1115,31 +1143,36 @@ void CRtcDemoDlg::OnBnClickedButtonPreview()
     //}
     GetDlgItemText(IDC_BUTTON_PREVIEW_VIDEO, str);
     if (0 == str.CompareNoCase(_T("预览"))) {
-        CString cur_dev_name;
-        string cur_dev_id;
-        GetDlgItem(IDC_COMBO_CAMERA)->GetWindowTextW(cur_dev_name);
-        if (cur_dev_name.IsEmpty()) {
-            MessageBox(_T("您当前没有任何视频设备！"));
-            return;
-        }
-        auto itor = _camera_dev_map.begin();
-        while (itor != _camera_dev_map.end()) {
-            if (itor->second.device_name.compare(unicode2utf(cur_dev_name.GetBuffer())) == 0) {
-                cur_dev_id = itor->first;
-                break;
-            }
-            ++itor;
-        }
-        auto tuple_size = FindBestVideoSize(itor->second.capability_vec);
 
         CameraSetting camera_setting;
+        CString cur_dev_name;
+        string cur_dev_id;
+
+        if (((CButton *)GetDlgItem(IDC_CHECK_ACTIVE_SCREEN))->GetCheck() == BST_CHECKED) {
+            OnBnClickedCheckActiveScreen();
+        } else {
+            GetDlgItem(IDC_COMBO_CAMERA)->GetWindowTextW(cur_dev_name);
+            if (cur_dev_name.IsEmpty()) {
+                MessageBox(_T("您当前没有任何视频设备！"));
+                return;
+            }
+            auto itor = _camera_dev_map.begin();
+            while (itor != _camera_dev_map.end()) {
+                if (itor->second.device_name.compare(unicode2utf(cur_dev_name.GetBuffer())) == 0) {
+                    cur_dev_id = itor->first;
+                    break;
+                }
+                ++itor;
+            }
+            auto tuple_size = FindBestVideoSize(itor->second.capability_vec);
+            camera_setting.device_name = unicode2utf(cur_dev_name.GetBuffer());
+            camera_setting.device_id = cur_dev_id;
+            camera_setting.width = std::get<0>(tuple_size);
+            camera_setting.height = std::get<1>(tuple_size);
+            camera_setting.max_fps = 15;
+            camera_setting.bitrate = 500000;
+        }
         camera_setting.render_hwnd = GetDlgItem(IDC_STATIC_VIDEO_PREVIEW2)->m_hWnd;
-        camera_setting.device_name = unicode2utf(cur_dev_name.GetBuffer());
-        camera_setting.device_id   = cur_dev_id;
-        camera_setting.width       = std::get<0>(tuple_size);
-        camera_setting.height      = std::get<1>(tuple_size);
-        camera_setting.max_fps     = 15;
-        camera_setting.bitrate     = 500000;
 
         if (0 == _rtc_video_interface->PreviewCamera(camera_setting)) {
             _wndStatusBar.SetText(_T("开启预览成功！"), 1, 0);
@@ -1149,6 +1182,9 @@ void CRtcDemoDlg::OnBnClickedButtonPreview()
             MessageBox(_T("预览失败！"));
         }
     } else {
+
+        OnBnClickedCheckActiveScreen();
+
         if (0 == _rtc_video_interface->UnPreviewCamera()) {
             _wndStatusBar.SetText(_T("停止本地预览！"), 1, 0);
             SetDlgItemText(IDC_BUTTON_PREVIEW_VIDEO, _T("预览"));
@@ -1501,8 +1537,8 @@ void CRtcDemoDlg::ImportExternalRawFrame()
     // 模拟导入视频数据,当前使用当前目录下指定的音视频文件
     _rtc_video_interface->EnableVideoFakeCamera(true);
     CameraSetting cs;
-    cs.width = 1280;
-    cs.height = 720;
+    cs.width = 1600;
+    cs.height = 800;
     cs.max_fps = 30;
     cs.bitrate = 2000000;
     cs.render_hwnd = GetDlgItem(IDC_STATIC_VIDEO_PREVIEW2)->m_hWnd;
@@ -1790,3 +1826,12 @@ void CRtcDemoDlg::OnBnClickedButtonPreviewScreen()
     }
 }
 
+void CRtcDemoDlg::OnBnClickedCheckDesktopAudio()
+{
+    // TODO: Add your control notification handler code here
+    bool enable_desktop_audio_capture =
+        (BST_CHECKED == ((CButton *)GetDlgItem(IDC_CHECK_DESKTOP_AUDIO))->GetCheck()) ? true : false;
+    if (_rtc_audio_interface) {
+        _rtc_audio_interface->MixDesktopAudio(enable_desktop_audio_capture, 0.5f);
+    }
+}
