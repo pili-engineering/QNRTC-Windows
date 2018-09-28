@@ -11,6 +11,7 @@
 #include "qn_rtc_audio.h"
 #include "qn_rtc_errorcode.h"
 #include "afxcmn.h"
+#include "CFullScreenDlg.h"
 
 using namespace std;
 using namespace qiniu;
@@ -98,6 +99,7 @@ protected:
     afx_msg void OnBnClickedCheckDx();
     afx_msg void OnBnClickedButtonPreviewScreen();
     afx_msg void OnBnClickedCheckImportRawData();
+    afx_msg void OnBnClickedCheckDesktopAudio();
 
     virtual BOOL PreTranslateMessage(MSG* pMsg);
 
@@ -175,4 +177,5 @@ private:
                                     _screen_wnd_map;           // screen windows map, key:source id
     CRichEditCtrl                   _msg_rich_edit_ctrl;       // 系统消息展示控件
     CProgressCtrl                   _local_volume_progress;    // 用于展示本地麦克风音量条
+    shared_ptr<CFullScreenDlg>      _full_dlg_ptr = nullptr;
 };
