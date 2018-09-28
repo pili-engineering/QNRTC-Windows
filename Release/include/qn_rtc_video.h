@@ -319,6 +319,87 @@ namespace qiniu
         * @return return 0 if success, or an error code
         */
         virtual int SetMirrorWhenDisplay(const std::string& user_id_, bool mirror_flag_) = 0;
+
+        /** Process video raw picture, crop or mirror; Current only support format:kI420
+        * @param [in] src_data_
+        *        pointer to source raw data
+        * @param [in] src_width_
+        *        source picture width
+        * @param [in] src_height_
+        *        source picture height
+        * @param [in] src_data_size_
+        *        source data size
+        * @param [in] picture_fmt_
+        *        source picture format, current only supported kI420
+        * @param [in] mirror_flag_
+        *        whether mirror source picture flag
+        * @param [in] origin_x_
+        *        crop x pos from top left
+        * @param [in] origin_y_
+        *        crop y pos from top left
+        * @param [in] dest_width_
+        *        crop width from source picture
+        * @param [in] dest_height_
+        *        crop height from source picture
+        * @param [in] dest_data_
+        *        dest data buffer pointer
+        * @param [in] max_dest_data_size_
+        *        dest_data_'s buffer size
+        * @param [out] dest_data_size_
+        *        memory dest_data_'s max size
+        * @return return 0 if success, or an error code
+        */
+        virtual int CropRawPicture(
+            unsigned char* src_data_,
+            const unsigned int& src_width_,
+            const unsigned int& src_height_,
+            const unsigned int& src_data_size_,
+            qiniu::VideoCaptureType picture_fmt_,
+            bool mirror_flag_,
+            const int& origin_x_,
+            const int& origin_y_,
+            const int& dest_width_,
+            const int& dest_height_,
+            unsigned char* dest_data_,
+            const unsigned int& max_dest_data_size_,
+            __out unsigned int& dest_data_size_
+            ) = 0;
+
+        /** Convert raw video picture to I420 format, support format: kRGB24,kABGR,kARGB,kBGRA
+        * @param [in] src_data_
+        *        pointer to source raw data
+        * @param [in] src_width_
+        *        source picture width
+        * @param [in] src_height_
+        *        source picture height
+        * @param [in] src_data_size_
+        *        source data size
+        * @param [in] src_picture_fmt_
+        *        source picture format
+        * @param [in] dest_data_
+        *        dest data buffer pointer
+        * @param [in] max_dest_data_size_
+        *        dest_data_'s buffer size
+        * @param [out] dest_data_size_
+        *        memory dest_data_'s max size
+        * @return return 0 if success, or an error code
+        */
+        virtual int ConvertToI420(
+            unsigned char* src_data_,
+            const unsigned int& src_width_,
+            const unsigned int& src_height_,
+            const unsigned int& src_data_size_,
+            qiniu::VideoCaptureType src_picture_fmt_,
+            unsigned char* dest_data_,
+            const unsigned int& max_dest_data_size_,
+            __out unsigned int& dest_data_size_
+        ) = 0;
+
+        /** Enable or disable video rendering, default d3d render is enabled.
+        * @param [in] enable_d3d_
+        *        true:use d3d render; false:use gdi render;
+        */
+        virtual void EnableD3dRender(bool enable_d3d_ = true) = 0;
         
     protected:
         virtual ~QNRTCVideo() {}

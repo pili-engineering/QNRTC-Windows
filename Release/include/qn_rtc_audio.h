@@ -246,10 +246,18 @@ namespace qiniu
         * @return 0 ~ 100£¬audio level >= 0 if success, else return -1
         */
         virtual unsigned int GetAudioLevel(const std::string& user_id_) = 0;
+
+        /** Enable or disable desktop audio capture and mixed with microphone
+        *   when publish audio stream. desktop audio same as system audio
+        * @param [in] enable_
+        *        enable or disable, internal default is disabled
+        * @param [in] volume_scale_ratio_
+        *        desktop audio volume scale ratio, default 1.0 does not adjust volume
+        * @return return 0 if success or an error code
+        */
+        virtual int MixDesktopAudio(bool enable_, float volume_scale_ratio_ = 1.0f) = 0;
         
     protected:
         virtual ~QNRTCAudio() {}
     };
 }
-
-
