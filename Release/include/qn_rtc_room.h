@@ -232,6 +232,7 @@ namespace qiniu
         *   and set it to nullptr before exiting the room
         * @param [in] listener_ptr_ 
         *        pointer of QNRTCRoomListener
+        * Not thread safe, call before JoinRoom or after LeaveRoom interface
         */
         virtual void SetRoomListener(QNRTCRoomListener* listener_ptr_) = 0;
 
