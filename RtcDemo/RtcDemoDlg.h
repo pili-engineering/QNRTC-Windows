@@ -1,5 +1,5 @@
 // RtcDemoDlg.h : header file
-//
+// 对 qiniu 单 Track 版本的 API 进行演示
 #pragma once
 #include <map>
 #include <unordered_map>
@@ -11,10 +11,12 @@
 #include "qn_rtc_audio.h"
 #include "qn_rtc_errorcode.h"
 #include "afxcmn.h"
-#include "CFullScreenDlg.h"
+#include "CVdieoRenderWnd.h"
 
 using namespace std;
 using namespace qiniu;
+
+class CRtcDemoV2;
 
 // CRtcDemoDlg dialog
 class CRtcDemoDlg 
@@ -100,6 +102,7 @@ protected:
     afx_msg void OnBnClickedButtonPreviewScreen();
     afx_msg void OnBnClickedCheckImportRawData();
     afx_msg void OnBnClickedCheckDesktopAudio();
+    afx_msg void OnBnClickedButtonV2();
 
     virtual BOOL PreTranslateMessage(MSG* pMsg);
 
@@ -109,9 +112,6 @@ protected:
 
     // 自动调整渲染窗口位置
     void         AdjustRenderWndPos();
-
-    // 从 AppServer 获取 AK、SK 签算后的 RoomToken
-    int          GetRoomToken(const string room_name_, const string user_id_, string& token_);
 
     std::tuple<int, int> FindBestVideoSize(const CameraCapabilityVec& camera_cap_vec_);
 
@@ -172,10 +172,11 @@ private:
     chrono::time_point<chrono::system_clock> _start_time;      // joined room time point
     thread                          _fake_video_thread;
     thread                          _fake_audio_thread;
-    atomic_bool                     _stop_fake_flag = false;
+    atomic_bool                     _stop_fake_flag      = false;
     unordered_map<int, ScreenWindowInfo>      
                                     _screen_wnd_map;           // screen windows map, key:source id
     CRichEditCtrl                   _msg_rich_edit_ctrl;       // 系统消息展示控件
     CProgressCtrl                   _local_volume_progress;    // 用于展示本地麦克风音量条
-    shared_ptr<CFullScreenDlg>      _full_dlg_ptr = nullptr;
+    shared_ptr<CVdieoRenderWnd>      _full_dlg_ptr        = nullptr;
+    CRtcDemoV2*                     _rtc_demo_dlg_v2     = nullptr;
 };
