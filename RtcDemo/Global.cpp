@@ -37,14 +37,14 @@ extern int GetRoomToken(const string& app_id_, const string room_name_, const st
     if (strnicmp(const_cast<char*>(tmp_uid.c_str()), "admin", tmp_uid.length()) == 0) {
         snprintf(url_buf,
             sizeof(url_buf),
-            "https://api-demo.qnsdk.com/v1/rtc/token/admin/app/%s/room/%s/user/%s",
+            "api-demo.qnsdk.com/v1/rtc/token/admin/app/%s/room/%s/user/%s",
             appId.c_str(),
             room_name_.c_str(),
             user_id_.c_str());
     } else {
         snprintf(url_buf,
             sizeof(url_buf),
-            "https://api-demo.qnsdk.com/v1/rtc/token/app/%s/room/%s/user/%s",
+            "api-demo.qnsdk.com/v1/rtc/token/app/%s/room/%s/user/%s",
             appId.c_str(),
             room_name_.c_str(),
             user_id_.c_str());
