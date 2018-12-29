@@ -1,4 +1,7 @@
 #pragma once
+#include<string>
+
+using namespace std;
 
 #ifdef WIN32
 //#include <Windows.h>

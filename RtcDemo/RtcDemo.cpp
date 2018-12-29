@@ -40,7 +40,8 @@ CRtcDemoApp theApp;
 
 BOOL CRtcDemoApp::InitInstance()
 {
-// TODO: call AfxInitRichEdit2() to initialize richedit2 library.\n"    InitMinDump();
+// TODO: call AfxInitRichEdit2() to initialize richedit2 library.\n"    
+    InitMinDump();
 
 	// InitCommonControlsEx() is required on Windows XP if an application
 	// manifest specifies use of ComCtl32.dll version 6 or later to enable

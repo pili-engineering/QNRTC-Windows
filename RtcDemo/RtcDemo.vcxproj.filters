@@ -39,7 +39,13 @@
     <ClInclude Include="charactor_convert.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="CFullScreenDlg.h">
+    <ClInclude Include="CRtcDemoV2.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Global.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CVdieoRenderWnd.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -53,7 +59,13 @@
     <ClCompile Include="stdafx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CFullScreenDlg.cpp">
+    <ClCompile Include="CRtcDemoV2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Global.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CVdieoRenderWnd.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

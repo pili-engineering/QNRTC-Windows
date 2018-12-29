@@ -9,10 +9,11 @@
 #include "afxdialogex.h"
 #include "charactor_convert.h"
 #include "qn_rtc_engine.h"
-#include "curl.h"
 #include <mmdeviceapi.h>
 #include <endpointvolume.h>
 #include "resource.h"
+#include "CRtcDemoV2.h"
+#include "Global.h"
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -20,11 +21,6 @@
 #else
 #pragma comment(lib, "QNRtcStreaming.lib")
 #endif // _DEBUG
-#pragma comment(lib, "libcurl.lib")
-#pragma comment(lib, "Ws2_32.lib")
-#pragma comment(lib, "winmm.lib")
-#pragma comment(lib, "wldap32.lib")
-#pragma comment(lib, "Version.lib")
 
 #define CUSTOM_RESOURCE_ID         10000
 #define CALLBACK_UI_TIMER_ID       1
@@ -108,57 +104,10 @@ BEGIN_MESSAGE_MAP(CRtcDemoDlg, CDialogEx)
     ON_BN_CLICKED(IDC_BUTTON_PREVIEW_SCREEN, &CRtcDemoDlg::OnBnClickedButtonPreviewScreen)
     ON_BN_CLICKED(IDC_CHECK_IMPORT_RAW_DATA, &CRtcDemoDlg::OnBnClickedCheckImportRawData)
     ON_BN_CLICKED(IDC_CHECK_DESKTOP_AUDIO, &CRtcDemoDlg::OnBnClickedCheckDesktopAudio)
+    ON_BN_CLICKED(IDC_BUTTON_V2, &CRtcDemoDlg::OnBnClickedButtonV2)
 END_MESSAGE_MAP()
 
 // CRtcDemoDlg message handlers
-
-static string GetAppVersion()
-{
-    DWORD dwInfoSize  = 0;
-    char exePath[MAX_PATH];
-    char ver_buf[128] = { 0 };
-    int ver_buf_len   = 0;
-    memset(exePath, 0, sizeof(exePath));
-
-    // 得到程序的自身路径
-    GetModuleFileNameA(NULL, exePath, sizeof(exePath) / sizeof(char));
-
-    // 判断是否能获取版本号
-    dwInfoSize = GetFileVersionInfoSizeA(exePath, NULL);
-
-    if (dwInfoSize == 0) {
-        return "";
-    } else {
-        BYTE* pData = new BYTE[dwInfoSize];
-        // 获取版本信息
-        if (!GetFileVersionInfoA(exePath, NULL, dwInfoSize, pData)) {
-            return "";
-        } else {
-            // 查询版本信息中的具体键值
-            LPVOID lpBuffer;
-            UINT uLength;
-            if (!::VerQueryValue((LPCVOID)pData, _T("\\"), &lpBuffer, &uLength)) {
-            } else {
-                DWORD dwVerMS;
-                DWORD dwVerLS;
-                dwVerMS = ((VS_FIXEDFILEINFO*)lpBuffer)->dwProductVersionMS;
-                dwVerLS = ((VS_FIXEDFILEINFO*)lpBuffer)->dwProductVersionLS;
-                ver_buf_len = snprintf(ver_buf,
-                    sizeof(ver_buf),
-                    "Version : %d.%d.%d.%d    BuildTime : %s %s",
-                    (dwVerMS >> 16),
-                    (dwVerMS & 0xFFFF),
-                    (dwVerLS >> 16),
-                    (dwVerLS & 0xFFFF),
-                    __DATE__,
-                    __TIME__
-                    );
-            }
-        }
-        delete pData;
-    }
-    return string(ver_buf, ver_buf_len);
-}
 
 BOOL CRtcDemoDlg::OnInitDialog()
 {
@@ -360,6 +309,7 @@ void CRtcDemoDlg::OnJoinResult(int error_code_, const std::string& error_str_,
                 MessageBox(msg_str, _T("登录失败："));
             }).detach();
             GetDlgItem(IDC_BUTTON_LOGIN)->SetWindowTextW(_T("登录"));
+            GetDlgItem(IDC_BUTTON_V2)->EnableWindow(TRUE);
             return;
         }
         if (user_data_vec_.empty()) {
@@ -444,6 +394,7 @@ void CRtcDemoDlg::OnLeave(int error_code_,
         GetDlgItem(IDC_STATIC_VIDEO_PREVIEW)->Invalidate();
         _user_stream_map.clear();
         _rtc_room_interface->LeaveRoom();
+        GetDlgItem(IDC_BUTTON_V2)->EnableWindow(TRUE);
     });
     SetTimer(CALLBACK_UI_TIMER_ID, 1, nullptr);
 }
@@ -879,6 +830,7 @@ void CRtcDemoDlg::OnBnClickedButtonJoin()
         }
         GetDlgItem(IDC_BUTTON_LOGIN)->SetWindowText(_T("登录中"));
         GetDlgItem(IDC_BUTTON_LOGIN)->EnableWindow(FALSE);
+        GetDlgItem(IDC_BUTTON_V2)->EnableWindow(FALSE);
 
         if (_join_room_thread.joinable()) {
             _join_room_thread.join();
@@ -886,15 +838,27 @@ void CRtcDemoDlg::OnBnClickedButtonJoin()
         _join_room_thread = std::thread([this]() {
             //向 AppServer 获取 token 
             _room_token.clear();
-            int ret = GetRoomToken(unicode2utf(_room_name.GetBuffer()),
+            int ret = GetRoomToken(
+                unicode2utf(_app_id.GetBuffer()),
+                unicode2utf(_room_name.GetBuffer()),
                 unicode2utf(_user_id.GetBuffer()), _room_token);
             if (ret != 0) {
                 _wndStatusBar.SetText(_T("获取房间 token 失败，请检查您的网络是否正常！"), 1, 0);
                 MessageBox(_T("获取房间 token 失败，请检查您的网络是否正常！"));
                 GetDlgItem(IDC_BUTTON_LOGIN)->SetWindowText(_T("登录"));
                 GetDlgItem(IDC_BUTTON_LOGIN)->EnableWindow(TRUE);
+                GetDlgItem(IDC_BUTTON_V2)->EnableWindow(TRUE);
                 return;
             }
+            if (strnicmp(
+                const_cast<char*>(unicode2utf(_user_id.GetBuffer()).c_str()), 
+                "admin", 
+                unicode2utf(_user_id.GetBuffer()).length()) == 0) {
+                _contain_admin_flag = true;
+            } else {
+                _contain_admin_flag = false;
+            }
+
             _wndStatusBar.SetText(_T("获取房间 token 成功！"), 1, 0);
 
             // 重新初始化 SDK 接口指针
@@ -913,12 +877,12 @@ void CRtcDemoDlg::OnBnClickedButtonJoin()
             _rtc_audio_interface->SetAudioListener(this);
 
             // 设置音频播放设备
-            int audio_playout_device_index = ((CComboBox *)GetDlgItem(IDC_COMBO_PLAYOUT))->GetCurSel();
-            audio_playout_device_index = (audio_playout_device_index == CB_ERR) ? 0 : audio_playout_device_index;
-            qiniu::AudioDeviceSetting audio_set;
-            audio_set.device_index = audio_playout_device_index;
-            audio_set.device_type = qiniu::AudioDeviceSetting::wdt_DefaultDevice;
-            _rtc_audio_interface->SetPlayoutDevice(audio_set);
+            //int audio_playout_device_index = ((CComboBox *)GetDlgItem(IDC_COMBO_PLAYOUT))->GetCurSel();
+            //audio_playout_device_index = (audio_playout_device_index == CB_ERR) ? 0 : audio_playout_device_index;
+            //qiniu::AudioDeviceSetting audio_set;
+            //audio_set.device_index = audio_playout_device_index;
+            //audio_set.device_type = qiniu::AudioDeviceSetting::wdt_DefaultDevice;
+            //_rtc_audio_interface->SetPlayoutDevice(audio_set);
 
             _rtc_room_interface->JoinRoom(_room_token);
 
@@ -951,6 +915,8 @@ void CRtcDemoDlg::OnBnClickedButtonJoin()
         _wndStatusBar.SetText(_T("当前未登录房间！"), 1, 0);
 
         Invalidate();
+
+        GetDlgItem(IDC_BUTTON_V2)->EnableWindow(TRUE);
     }
 }
 
@@ -1012,7 +978,7 @@ void CRtcDemoDlg::OnBnClickedButtonPublish()
                     camera_setting.device_id = video_dev_id;
                     camera_setting.width = std::get<0>(tuple_size);
                     camera_setting.height = std::get<1>(tuple_size);
-                    camera_setting.max_fps = 15;
+                    camera_setting.max_fps = 30;
                     camera_setting.bitrate = 500000;
                 }
             }
@@ -1099,7 +1065,7 @@ void CRtcDemoDlg::OnDestroy()
     _user_stream_map.clear();
 
     _wndStatusBar.DestroyWindow();
-
+    
     __super::OnDestroy();
 }
 
@@ -1198,6 +1164,15 @@ void CRtcDemoDlg::OnBnClickedButtonPreview()
 
 BOOL CRtcDemoDlg::PreTranslateMessage(MSG* pMsg)
 {
+    if (WM_SHOWWINDOW == pMsg->message) {
+        ShowWindow(SW_SHOW);
+        if (_rtc_demo_dlg_v2) {
+            _rtc_demo_dlg_v2->DestroyWindow();
+            delete _rtc_demo_dlg_v2;
+            _rtc_demo_dlg_v2 = nullptr;
+        }
+        return TRUE;
+    }
     return __super::PreTranslateMessage(pMsg);
 }
 
@@ -1344,81 +1319,6 @@ void CRtcDemoDlg::OnCbnSelchangeComboPlayout()
     }
 }
 
-size_t WriteBuffer(void *src_, size_t src_size_, size_t blocks_, void *param_)
-{
-    string *str = (string*)(param_);
-    str->append((char *)src_, src_size_ * blocks_);
-
-    return str->size();
-}
-
-int CRtcDemoDlg::GetRoomToken(const string room_name_, const string user_id_, string& token_)
-{
-    if (room_name_.empty() || user_id_.empty()) {
-        return -1;
-    }
-    CString appId_str;
-    string appId = "d8lk7l4ed";
-    GetDlgItemText(IDC_EDIT_APPID, appId_str);
-    if (!appId_str.IsEmpty()) {
-        appId = unicode2utf(appId_str.GetBuffer());
-    }
-
-    curl_global_init(CURL_GLOBAL_ALL);
-    auto curl = curl_easy_init();
-
-    // set options
-    char url_buf[1024] = { 0 };
-    string tmp_uid = user_id_;
-
-    // 服务端合流的默认限制：user id 等于 admin 则拥有合流的权限
-    if (strnicmp(const_cast<char*>(tmp_uid.c_str()), "admin", tmp_uid.length()) == 0) {
-        snprintf(url_buf,
-            sizeof(url_buf),
-            "https://api-demo.qnsdk.com/v1/rtc/token/admin/app/%s/room/%s/user/%s",
-            appId.c_str(),
-            room_name_.c_str(),
-            user_id_.c_str());
-        _contain_admin_flag = true;
-    } else {
-        snprintf(url_buf,
-            sizeof(url_buf),
-            "https://api-demo.qnsdk.com/v1/rtc/token/app/%s/room/%s/user/%s",
-            appId.c_str(),
-            room_name_.c_str(),
-            user_id_.c_str());
-        _contain_admin_flag = false;
-    }
-
-    curl_easy_setopt(curl, CURLOPT_URL, url_buf);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteBuffer);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &token_);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3);
-
-    // send request now
-    int status(0);
-    CURLcode result = curl_easy_perform(curl);
-    if (result == CURLE_OK) {
-        long code;
-        result = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &code);
-        if (result == CURLE_OK) {
-            if (code != 200) {
-                status = -2; // server auth failed
-            } else {
-                status = 0; //success
-            }
-        } else {
-            status = -3; //connect server timeout
-        }
-    } else {
-        status = -3; //connect server timeout
-    }
-    curl_easy_cleanup(curl);
-    curl_global_cleanup();
-
-    return status;
-}
-
 std::tuple<int, int> CRtcDemoDlg::FindBestVideoSize(const CameraCapabilityVec& camera_cap_vec_)
 {
     if (camera_cap_vec_.empty()) {
@@ -1537,10 +1437,10 @@ void CRtcDemoDlg::ImportExternalRawFrame()
     // 模拟导入视频数据,当前使用当前目录下指定的音视频文件
     _rtc_video_interface->EnableVideoFakeCamera(true);
     CameraSetting cs;
-    cs.width = 1600;
-    cs.height = 800;
+    cs.width = 426;
+    cs.height = 240;
     cs.max_fps = 30;
-    cs.bitrate = 2000000;
+    cs.bitrate = 200000;
     cs.render_hwnd = GetDlgItem(IDC_STATIC_VIDEO_PREVIEW2)->m_hWnd;
     _rtc_video_interface->SetCameraParams(cs);
     if (_fake_video_thread.joinable()) {
@@ -1549,8 +1449,8 @@ void CRtcDemoDlg::ImportExternalRawFrame()
     }
     _fake_video_thread = thread([&] {
         FILE* fp = nullptr;
-        fopen_s(&fp, "foreman_320x240.yuv", "rb");
-        uint8_t *buf = (uint8_t*)malloc(320 * 240* 3 / 2);
+        fopen_s(&fp, "426x240.yuv", "rb");
+        uint8_t *buf = (uint8_t*)malloc(426 * 240* 3 / 2);
         if (!fp || !buf) {
             MessageBox(_T("foreman_320x240.yuv 文件打开失败，请确认此文件件是否存在!"));
             return;
@@ -1559,12 +1459,12 @@ void CRtcDemoDlg::ImportExternalRawFrame()
         _stop_fake_flag = false;
         chrono::system_clock::time_point start_tp = chrono::system_clock::now();
         while (!_stop_fake_flag) {
-            ret = fread_s(buf, 320 * 240 * 3 / 2, 1, 320 * 240 * 3 / 2, fp);
+            ret = fread_s(buf, 426 * 240 * 3 / 2, 1, 426 * 240 * 3 / 2, fp);
             if (ret > 0) {
                 _rtc_video_interface->InputVideoFrame(
                     buf,
-                    320 * 240 * 3 / 2,
-                    320,
+                    426 * 240 * 3 / 2,
+                    426,
                     240,
                     chrono::duration_cast<chrono::microseconds>(chrono::system_clock::now() - start_tp).count(),
                     qiniu::VideoCaptureType::kI420,
@@ -1587,9 +1487,9 @@ void CRtcDemoDlg::ImportExternalRawFrame()
     }
     _fake_audio_thread = thread([&] {
         FILE* fp = nullptr;
-        fopen_s(&fp, "44100hz_16bits_2channels.pcm", "rb");
+        fopen_s(&fp, "44100_16bits_2channels.pcm", "rb");
         if (!fp) {
-            MessageBox(_T("PCM 文件:44100hz_16bits_2channels.pcm 打开失败，请确认此文件件是否存在!"));
+            MessageBox(_T("PCM 文件:44100_16bits_2channels.pcm 打开失败，请确认此文件件是否存在!"));
             return;
         }
         // 每次导入 20 ms 的数据，即 441 * 2 个 samples
@@ -1834,4 +1734,23 @@ void CRtcDemoDlg::OnBnClickedCheckDesktopAudio()
     if (_rtc_audio_interface) {
         _rtc_audio_interface->MixDesktopAudio(enable_desktop_audio_capture, 0.5f);
     }
+}
+
+void CRtcDemoDlg::OnBnClickedButtonV2()
+{
+    // TODO: Add your control notification handler code here
+    CString btn_str;
+    GetDlgItemText(IDC_BUTTON_LOGIN, btn_str);
+    if (btn_str.CompareNoCase(_T("登录")) != 0) {
+        OnBnClickedButtonJoin();
+    }
+    if (_rtc_room_interface) {
+        _rtc_room_interface->Release();
+        _rtc_room_interface = nullptr;
+    }
+
+    _rtc_demo_dlg_v2 = new CRtcDemoV2(this);
+    _rtc_demo_dlg_v2->Create(IDD_DIALOG_V2, GetDesktopWindow());
+    _rtc_demo_dlg_v2->ShowWindow(SW_NORMAL);
+    this->ShowWindow(SW_HIDE);
 }
