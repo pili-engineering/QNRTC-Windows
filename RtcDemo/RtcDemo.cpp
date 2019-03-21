@@ -5,6 +5,7 @@
 #include "stdafx.h"
 #include "RtcDemo.h"
 #include "RtcDemoDlg.h"
+#include "CRtcDemoV2.h"
 #include "minidump.h"
 
 #ifdef _DEBUG
@@ -72,7 +73,7 @@ BOOL CRtcDemoApp::InitInstance()
 	// such as the name of your company or organization
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
 
-	CRtcDemoDlg dlg;
+	CRtcDemoV2 dlg(nullptr, nullptr);
 	m_pMainWnd = &dlg;
 	INT_PTR nResponse = dlg.DoModal();
 	if (nResponse == IDOK)
