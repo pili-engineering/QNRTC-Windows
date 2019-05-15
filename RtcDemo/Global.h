@@ -10,4 +10,4 @@ extern int GetRoomToken(
     string& token_
 );
 
-extern string GetAppVersion();
+extern string GetAppVersion(const string& date_str, const string& time_str);

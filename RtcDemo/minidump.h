@@ -1,4 +1,5 @@
-#pragma once  
+#pragma once
+#ifndef _WIN64
 #include <windows.h>  
 #include <DbgHelp.h>  
 #include <stdlib.h>  
@@ -106,3 +107,4 @@ void InitMinDump()
 	//注册异常处理函数  
 	SetUnhandledExceptionFilter(MyUnhandledExceptionFilter);
 }
+#endif // _WIN64

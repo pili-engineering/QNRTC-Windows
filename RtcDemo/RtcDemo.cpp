@@ -42,7 +42,9 @@ CRtcDemoApp theApp;
 BOOL CRtcDemoApp::InitInstance()
 {
 // TODO: call AfxInitRichEdit2() to initialize richedit2 library.\n"    
+#ifndef _WIN64
     InitMinDump();
+#endif // WIN32
 
 	// InitCommonControlsEx() is required on Windows XP if an application
 	// manifest specifies use of ComCtl32.dll version 6 or later to enable
@@ -73,7 +75,8 @@ BOOL CRtcDemoApp::InitInstance()
 	// such as the name of your company or organization
 	SetRegistryKey(_T("Local AppWizard-Generated Applications"));
 
-	CRtcDemoV2 dlg(nullptr, nullptr);
+	//CRtcDemoDlg dlg;
+    CRtcDemoV2 dlg(NULL, NULL);
 	m_pMainWnd = &dlg;
 	INT_PTR nResponse = dlg.DoModal();
 	if (nResponse == IDOK)
