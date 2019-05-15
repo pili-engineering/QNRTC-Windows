@@ -1,20 +1,12 @@
 #include "stdafx.h"
 #include "Global.h"
-#include "curl.h"
+#include "httplib.hpp"
 
-#pragma comment(lib, "libcurl.lib")
+#if defined _WIN32
 #pragma comment(lib, "Ws2_32.lib")
-#pragma comment(lib, "winmm.lib")
 #pragma comment(lib, "wldap32.lib")
 #pragma comment(lib, "Version.lib")
-
-size_t WriteBuffer(void *src_, size_t src_size_, size_t blocks_, void *param_)
-{
-    string *str = (string*)(param_);
-    str->append((char *)src_, src_size_ * blocks_);
-
-    return str->size();
-}
+#endif
 
 extern int GetRoomToken(const string& app_id_, const string room_name_, const string user_id_, string& token_)
 {
@@ -25,63 +17,47 @@ extern int GetRoomToken(const string& app_id_, const string room_name_, const st
     if (!app_id_.empty()) {
         appId = app_id_;
     }
-
-    curl_global_init(CURL_GLOBAL_ALL);
-    auto curl = curl_easy_init();
-
+    
     // set options
     char url_buf[1024] = { 0 };
     string tmp_uid = user_id_;
 
-    // ·şÎñ¶ËºÏÁ÷µÄÄ¬ÈÏÏŞÖÆ£ºuser id µÈÓÚ admin ÔòÓµÓĞºÏÁ÷µÄÈ¨ÏŞ
+    // æœåŠ¡ç«¯åˆæµçš„é»˜è®¤é™åˆ¶ï¼šuser id ç­‰äº admin åˆ™æ‹¥æœ‰åˆæµçš„æƒé™ 
     if (strnicmp(const_cast<char*>(tmp_uid.c_str()), "admin", tmp_uid.length()) == 0) {
         snprintf(url_buf,
             sizeof(url_buf),
-            "api-demo.qnsdk.com/v1/rtc/token/admin/app/%s/room/%s/user/%s",
+            "/v1/rtc/token/admin/app/%s/room/%s/user/%s",
             appId.c_str(),
             room_name_.c_str(),
             user_id_.c_str());
     } else {
         snprintf(url_buf,
             sizeof(url_buf),
-            "api-demo.qnsdk.com/v1/rtc/token/app/%s/room/%s/user/%s",
+            "/v1/rtc/token/app/%s/room/%s/user/%s",
             appId.c_str(),
             room_name_.c_str(),
             user_id_.c_str());
     }
-
-    curl_easy_setopt(curl, CURLOPT_URL, url_buf);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteBuffer);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &token_);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 3);
-
+    
     TRACE(url_buf);
-
+    
+    httplib::Client cli("api-demo.qnsdk.com", 80, 5);
     // send request now
     int status(0);
-    CURLcode result = curl_easy_perform(curl);
-    if (result == CURLE_OK) {
-        long code;
-        result = curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &code);
-        if (result == CURLE_OK) {
-            if (code != 200) {
-                status = -2; // server auth failed
-            } else {
-                status = 0; //success
-            }
+    auto response_ptr = cli.Get(url_buf);
+    if (response_ptr) {
+        if (200 == response_ptr->status) {
+            token_ = response_ptr->body;
+            return 0;
         } else {
-            status = -3; //connect server timeout
+            return -1;
         }
     } else {
-        status = -3; //connect server timeout
+        return -3; //connect server timeout
     }
-    curl_easy_cleanup(curl);
-    curl_global_cleanup();
-
-    return status;
 }
 
-string GetAppVersion()
+string GetAppVersion(const string& date_str, const string& time_str)
 {
     DWORD dwInfoSize = 0;
     char exePath[MAX_PATH];
@@ -89,21 +65,21 @@ string GetAppVersion()
     int ver_buf_len = 0;
     memset(exePath, 0, sizeof(exePath));
 
-    // µÃµ½³ÌĞòµÄ×ÔÉíÂ·¾¶
+    // å¾—åˆ°ç¨‹åºçš„è‡ªèº«è·¯å¾„ 
     GetModuleFileNameA(NULL, exePath, sizeof(exePath) / sizeof(char));
 
-    // ÅĞ¶ÏÊÇ·ñÄÜ»ñÈ¡°æ±¾ºÅ
+    // åˆ¤æ–­æ˜¯å¦èƒ½è·å–ç‰ˆæœ¬å· 
     dwInfoSize = GetFileVersionInfoSizeA(exePath, NULL);
 
     if (dwInfoSize == 0) {
         return "";
     } else {
         BYTE* pData = new BYTE[dwInfoSize];
-        // »ñÈ¡°æ±¾ĞÅÏ¢
+        // è·å–ç‰ˆæœ¬ä¿¡æ¯
         if (!GetFileVersionInfoA(exePath, NULL, dwInfoSize, pData)) {
             return "";
         } else {
-            // ²éÑ¯°æ±¾ĞÅÏ¢ÖĞµÄ¾ßÌå¼üÖµ
+            // æŸ¥è¯¢ç‰ˆæœ¬ä¿¡æ¯ä¸­çš„å…·ä½“é”®å€¼ 
             LPVOID lpBuffer;
             UINT uLength;
             if (!::VerQueryValue((LPCVOID)pData, _T("\\"), &lpBuffer, &uLength)) {
@@ -119,8 +95,8 @@ string GetAppVersion()
                     (dwVerMS & 0xFFFF),
                     (dwVerLS >> 16),
                     (dwVerLS & 0xFFFF),
-                    __DATE__,
-                    __TIME__
+                    date_str.c_str(),
+                    time_str.c_str()
                 );
             }
         }

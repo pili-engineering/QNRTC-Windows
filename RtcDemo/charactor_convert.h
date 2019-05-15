@@ -3,7 +3,7 @@
 
 using namespace std;
 
-#ifdef WIN32
+#ifdef _WIN32
 //#include <Windows.h>
 
 #ifdef UNICODE

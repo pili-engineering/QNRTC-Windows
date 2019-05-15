@@ -151,7 +151,7 @@ BOOL CRtcDemoDlg::OnInitDialog()
     qiniu::QNRTCEngine::Init();
 
     // 设置日志级别和文件名，否则没有日志输出
-    qiniu::QNRTCEngine::SetLogParams(qiniu::LOG_INFO, "rtc-log", "rtc.log");
+    qiniu::QNRTCEngine::SetLogParams(qiniu::LOG_DEBUG, "rtc-log", "rtc.log");
 
     _rtc_room_interface = QNRTCRoom::ObtainRoomInterface();
     if (!_rtc_room_interface) {
@@ -176,9 +176,9 @@ BOOL CRtcDemoDlg::OnInitDialog()
     // 设置连麦质量回调间隔时间，单位：秒
     _rtc_room_interface->EnableStatisticCallback(5);
 
-    // 初始化用户列表控件
+    // 初始化用户列表控件 
     _user_list_ctrl.SetExtendedStyle(LVS_EX_FULLROWSELECT);
-    _user_list_ctrl.InsertColumn(0, _T("用户 ID"), LVCFMT_LEFT, 100, 0);    //设置列
+    _user_list_ctrl.InsertColumn(0, _T("用户 ID"), LVCFMT_LEFT, 100, 0);    //设置列 
     _user_list_ctrl.InsertColumn(1, _T("用户发布流状态"), LVCFMT_LEFT, 350, 1);
     ((CButton*)GetDlgItem(IDC_CHECK_ENABLE_AUDIO))->SetCheck(1);
     ((CButton*)GetDlgItem(IDC_CHECK_ENABLE_VIDEO))->SetCheck(1);
@@ -192,7 +192,7 @@ BOOL CRtcDemoDlg::OnInitDialog()
     }
     ((CComboBox *)GetDlgItem(IDC_COMBO_CAMERA))->SetCurSel(0);
 
-    // 初始化音频采集设备列表
+    // 初始化音频采集设备列表 
     int audio_rec_count = _rtc_audio_interface->GetAudioDeviceCount(AudioDeviceInfo::adt_record);
     for (int i(0); i < audio_rec_count; ++i) {
         AudioDeviceInfo audio_info;
@@ -205,7 +205,7 @@ BOOL CRtcDemoDlg::OnInitDialog()
     }
     ((CComboBox *)GetDlgItem(IDC_COMBO_MICROPHONE))->SetCurSel(0);
 
-    // 初始化音频播放设备列表
+    // 初始化音频播放设备列表 
     int audio_play_count = _rtc_audio_interface->GetAudioDeviceCount(AudioDeviceInfo::adt_playout);
     for (int i(0); i < audio_play_count; ++i) {
         AudioDeviceInfo audio_info;
@@ -218,13 +218,13 @@ BOOL CRtcDemoDlg::OnInitDialog()
     }
     ((CComboBox *)GetDlgItem(IDC_COMBO_PLAYOUT))->SetCurSel(0);
 
-    // 初始化音量控制条配置
+    // 初始化音量控制条配置 
     ((CSliderCtrl*)GetDlgItem(IDC_SLIDER_RECORD))->SetRange(0, 255);
     ((CSliderCtrl*)GetDlgItem(IDC_SLIDER_RECORD))->SetPos(255);
     ((CSliderCtrl*)GetDlgItem(IDC_SLIDER_PLAYOUT))->SetRange(0, 255);
     ((CSliderCtrl*)GetDlgItem(IDC_SLIDER_PLAYOUT))->SetPos(255);
 
-    // 初始化屏幕录制窗口列表
+    // 初始化屏幕录制窗口列表 
     OnBnClickedBtnFlush();
 
     return TRUE;  // return TRUE  unless you set the focus to a control
@@ -278,7 +278,7 @@ void CRtcDemoDlg::OnStateChanged(RoomState status_)
     if (status_ == qiniu::rs_reconnecting) {
         lock_guard<recursive_mutex> lock_(_mutex);
         _call_function_vec.emplace_back([=]() {
-            // 网络断开，重连中... 用户可什么都不做，SDK 内部会不断的尝试重连
+            // 网络断开，重连中... 用户可什么都不做，SDK 内部会不断的尝试重连 
             _wndStatusBar.SetText(_T("网络断开，重连中。。。"), 1, 0);
         });
         SetTimer(CALLBACK_UI_TIMER_ID, 1, nullptr);
@@ -291,7 +291,7 @@ void CRtcDemoDlg::OnJoinResult(int error_code_, const std::string& error_str_,
     TRACE("%s", __FUNCTION__);
     lock_guard<recursive_mutex> lock_(_mutex);
     _call_function_vec.emplace_back([=]() {
-        // 取消原来所有的订阅, 并释放资源
+        // 取消原来所有的订阅, 并释放资源  
         for (auto&& itor : _user_stream_map) {
             if (itor.second.is_subscribed) {
                 _rtc_room_interface->UnSubscribe(itor.first);
@@ -299,7 +299,7 @@ void CRtcDemoDlg::OnJoinResult(int error_code_, const std::string& error_str_,
         }
         _user_stream_map.clear();
 
-        // 适配界面
+        // 适配界面 
         GetDlgItem(IDC_BUTTON_LOGIN)->EnableWindow(TRUE);
         if (error_code_ != 0 || user_data_vec_.empty()) {
             CString msg_str;
@@ -326,7 +326,7 @@ void CRtcDemoDlg::OnJoinResult(int error_code_, const std::string& error_str_,
         CString local_user_id;
         GetDlgItemText(IDC_EDIT_PLAYER_ID, local_user_id);
 
-        // 本地记录用户信息
+        // 本地记录用户信息 
         for each (UserDataInfo itor in user_data_vec_)
         {
             UserStreamInfo info;
@@ -354,7 +354,7 @@ void CRtcDemoDlg::OnJoinResult(int error_code_, const std::string& error_str_,
 
             _user_list_ctrl.SetItemText(0, 1, publish_state_str);
             
-            // 自动订阅所有远端用户数据流
+            // 自动订阅所有远端用户数据流 
             if (itor.video_published || itor.audio_published) {
                 OnRemotePublish(itor.user_id, itor.audio_published, itor.video_published);
             }
@@ -884,8 +884,8 @@ void CRtcDemoDlg::OnBnClickedButtonJoin()
             //audio_set.device_type = qiniu::AudioDeviceSetting::wdt_DefaultDevice;
             //_rtc_audio_interface->SetPlayoutDevice(audio_set);
 
+            _rtc_room_interface->SetIcePolicy(preferUdp);
             _rtc_room_interface->JoinRoom(_room_token);
-
             WriteConfigFile();
         });
     } else {
@@ -1425,7 +1425,7 @@ void CRtcDemoDlg::InitDemoUI()
     //设置状态栏文本  
     _wndStatusBar.SetText(_T("通话时长：00:00::00"), 0, 0);
     _wndStatusBar.SetText(_T("连麦状态"), 1, 0);
-    _wndStatusBar.SetText(utf2unicode(GetAppVersion()).c_str(), 2, 0);
+    _wndStatusBar.SetText(utf2unicode(GetAppVersion(__DATE__, __TIME__)).c_str(), 2, 0);
 
     // 初始化麦克风音量条控件
     _local_volume_progress.SetRange(0, 100);
@@ -1457,7 +1457,7 @@ void CRtcDemoDlg::ImportExternalRawFrame()
         }
         size_t ret(0);
         _stop_fake_flag = false;
-        chrono::system_clock::time_point start_tp = chrono::system_clock::now();
+        chrono::steady_clock::time_point start_tp = chrono::steady_clock::now();
         while (!_stop_fake_flag) {
             ret = fread_s(buf, 426 * 240 * 3 / 2, 1, 426 * 240 * 3 / 2, fp);
             if (ret > 0) {
@@ -1466,14 +1466,14 @@ void CRtcDemoDlg::ImportExternalRawFrame()
                     426 * 240 * 3 / 2,
                     426,
                     240,
-                    chrono::duration_cast<chrono::microseconds>(chrono::system_clock::now() - start_tp).count(),
+                    chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - start_tp).count(),
                     qiniu::VideoCaptureType::kI420,
                     qiniu::kVideoRotation_0);
             } else {
                 fseek(fp, 0, SEEK_SET);
                 continue;
             }
-            this_thread::sleep_for(chrono::milliseconds(1000 / 30)); // 15 fps
+            Sleep(1000 / 30); // 15 fps
         }
         free(buf);
         fclose(fp);
@@ -1497,12 +1497,12 @@ void CRtcDemoDlg::ImportExternalRawFrame()
 
         size_t ret(0);
         _stop_fake_flag = false;
-        chrono::system_clock::time_point start_tp = chrono::system_clock::now();
+        chrono::steady_clock::time_point start_tp = chrono::steady_clock::now();
         int64_t audio_frame_count(0);
         while (!_stop_fake_flag) {
-            if (chrono::duration_cast<chrono::microseconds>(chrono::system_clock::now() - start_tp).count() >= audio_frame_count * 20000) {
+            if (chrono::duration_cast<chrono::microseconds>(chrono::steady_clock::now() - start_tp).count() >= audio_frame_count * 20000) {
             } else {
-                this_thread::sleep_for(chrono::microseconds(10));
+                Sleep(10);
                 continue;
             }
 
