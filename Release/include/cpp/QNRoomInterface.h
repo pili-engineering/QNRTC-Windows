@@ -231,6 +231,7 @@ namespace qiniu_v2 {
         // 配置各个 Track 的合流参数
         // @param add_tracks_list_ 新增 Tracks 的合流配置
         // @param remove_tracks_list 去除 Tracks 的合流配置，Track Id 链表
+        // @param job_id 合流任务id
         // @return 0:操作成功，具体合流结果请通过观看旁路直播进行查看 
         virtual int SetMergeStreamlayouts(
             const MergeOptInfoList& add_tracks_list_,
@@ -240,6 +241,7 @@ namespace qiniu_v2 {
 
         // 停止所有此房间内的所有合流任务
         // 房间未连接的情况下停止无效
+        // @param job_id 合流任务id
         // @return 0:操作成功，具体合流结果请通过观看旁路直播进行查看 
         virtual int StopMergeStream(const string& job_id = string()) = 0;
 
