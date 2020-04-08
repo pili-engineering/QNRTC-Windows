@@ -120,6 +120,10 @@ namespace qiniu_v2 {
         };
 
     public:
+
+        // 用于获取SDK版本号 
+        static void GetVersion(std::string& ver);
+
         // 用于获取全局唯一的房间实例指针 
         static QNRoomInterface* ObtainRoomInterface();
 
@@ -217,21 +221,31 @@ namespace qiniu_v2 {
         // @return 0:成功；其它请参考错误码列表 
         virtual int MuteVideo(const string& track_id_, bool mute_flag_) = 0;
 
+        // 创建自定义合流任务
+        // @param job_desc: 合流任务配置结构
+        // @param merge_background: 合流背景图
+        // @param merge_watermark: 合流水印图
+        // @return 0:成功；其它请参考错误码列表 
+        virtual int CreateMergeJob(const MergeJob& job_desc, const MergeLayer& merge_background, const MergeLayerList& merge_watermark) = 0;
+
         // 配置各个 Track 的合流参数
         // @param add_tracks_list_ 新增 Tracks 的合流配置
         // @param remove_tracks_list 去除 Tracks 的合流配置，Track Id 链表
+        // @param job_id 合流任务id
         // @return 0:操作成功，具体合流结果请通过观看旁路直播进行查看 
         virtual int SetMergeStreamlayouts(
             const MergeOptInfoList& add_tracks_list_,
-            const list<string>& remove_tracks_id_list
+            const list<string>& remove_tracks_id_list,
+            const string& job_id = string()
         ) = 0;
 
         // 停止所有此房间内的所有合流任务
         // 房间未连接的情况下停止无效
+        // @param job_id 合流任务id
         // @return 0:操作成功，具体合流结果请通过观看旁路直播进行查看 
-        virtual int StopMergeStream() = 0;
+        virtual int StopMergeStream(const string& job_id = string()) = 0;
 
-        // 配置媒体传输通道底层传输协议，默认为 forceUdp，当用户网络下 UDP 不通时，可配置使用 forceTcp 或 preferUdp
+        // 配置媒体传输通道底层传输协议，默认为 preferUdp，当用户网络下 UDP 不通时，SDK 自动降级使用 TCP
         // @param policy_ value of Enum:IcePolicy
         virtual void SetIcePolicy(qiniu_v2::IcePolicy policy_) = 0;
 

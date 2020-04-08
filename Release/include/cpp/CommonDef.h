@@ -64,6 +64,39 @@ namespace qiniu_v2 {
         preferUdp = 2,      // media transfer use udp first, and if udp don't work, then downgrade using tcp
     };
 
+    // 合流画面填充方式 
+    enum MergeStretchMode
+    {
+        ASPECT_FILL  = 0,   // 在保持长宽比的前提下，缩放视频，使其充满容器 
+        ASPECT_FIT   = 1,   // 在保持长宽比的前提下，缩放视频，使其在容器内完整显示，边缘部分填充黑边 
+        SCALE_TO_FIT = 2,   // 缩放视频，使其填充满容器，可能导致拉伸变形 
+    };
+
+    // 合流背景、水印配置参数 
+    struct MergeLayer {
+        string layer_url;       // http网络图片地址 
+        int pos_x = 0;          // 在合流画面中的x坐标 
+        int pos_y = 0;          // 在合流画面中的y坐标 
+        int layer_width = 0;    // 该图片占宽 
+        int layer_height = 0;   // 该图片占高 
+    };
+
+    typedef list<MergeLayer> MergeLayerList;
+
+    // 自定义合流配置信息 
+    struct MergeJob {
+        string job_id;              // 合流任务id，保证唯一 
+        string publish_url;         // 自定义合流推流地址 
+
+        int width = 0;              // 合流画布宽 
+        int height = 0;             // 合流画布高 
+        int fps = 0;                // 合流帧率 
+        int bitrate = 0;            // 合流码率bps 
+        int min_bitrate = 0;        // 最小码率 
+        int max_bitrate = 0;        // 最大码率 
+        MergeStretchMode stretch_mode = ASPECT_FILL;
+    };
+
     // 旁路直播合流配置信息，通过 SDK 将参数发送到服务端 
     // 服务端按照指定的参数进行合流并推出 RTMP 流 
     struct MergeOptInfo

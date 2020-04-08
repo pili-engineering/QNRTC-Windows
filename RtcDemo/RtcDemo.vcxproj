@@ -224,6 +224,7 @@ copy $(SolutionDir)$(PlatformTarget)\$(Configuration)\$(TargetName).pdb $(Projec
     <ClInclude Include="CRtcDemoV2.h" />
     <ClInclude Include="Global.h" />
     <ClInclude Include="httplib.hpp" />
+    <ClInclude Include="MergeDialog.h" />
     <ClInclude Include="minidump.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="RtcDemo.h" />
@@ -241,6 +242,7 @@ copy $(SolutionDir)$(PlatformTarget)\$(Configuration)\$(TargetName).pdb $(Projec
     <ClCompile Include="Global.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Use</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="MergeDialog.cpp" />
     <ClCompile Include="RtcDemo.cpp" />
     <ClCompile Include="RtcDemoDlg.cpp" />
     <ClCompile Include="stdafx.cpp">
