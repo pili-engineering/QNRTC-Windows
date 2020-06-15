@@ -6,7 +6,7 @@
 #include "resource.h"
 #include <fstream>
 #include "Global.h"
-#include "qn_rtc_errorcode.h"
+#include "QNErrorCode.h"
 
 #define CHECK_CALLBACK_TIMER 10001       // SDK 事件驱动定时器
 #define UPDATE_TIME_DURATION_TIMER 10002 // 定时更新连麦时长
@@ -34,7 +34,22 @@ IMPLEMENT_DYNAMIC(CRtcDemoV2, CDialogEx)
 #define core_min(a, b)		((a) < (b) ? (a) : (b))
 #endif
 
-//获取音频分贝值
+// 获取roomtoken,JoinRoom的第一个输入参数是此方法返回的token_。
+// @param app_id_ 获取token所需打点appid
+// @param room_name_  房间名
+// @param user_id_  房间ID
+// @param time_out_ 获取超时时间
+// @param token_ 输出的roomtoken
+// @return 返回0时表示成功，-1表示失败，-3表示获取超时
+extern "C" QINIU_EXPORT_DLL int GetRoomToken_s(
+    const std::string& app_id_,
+    const std::string& room_name_,
+    const std::string& user_id_,
+    const std::string& host_name_,
+    const int time_out_,
+    std::string& token_);
+
+// 获取音频分贝值
 static uint32_t ProcessAudioLevel(const int16_t* data, const int32_t& data_size)
 {
     uint32_t ret = 0;
@@ -74,7 +89,7 @@ void CRtcDemoV2::DoDataExchange(CDataExchange* pDX)
 BOOL CRtcDemoV2::OnInitDialog()
 {
     CDialogEx::OnInitDialog();
-
+    
     ReadConfigFile();
 
     std::string ver;
@@ -105,6 +120,7 @@ BEGIN_MESSAGE_MAP(CRtcDemoV2, CDialogEx)
     ON_WM_CREATE()
     ON_WM_TIMER()
     ON_MESSAGE(MERGE_MESSAGE_ID, &CRtcDemoV2::OnHandleMessage)
+    ON_MESSAGE(SEND_MESSAGE_ID, &CRtcDemoV2::OnSendMessage)
     ON_BN_CLICKED(IDC_BUTTON_LOGIN, &CRtcDemoV2::OnBnClickedButtonLogin)
     ON_BN_CLICKED(IDC_BUTTON_PREVIEW_VIDEO, &CRtcDemoV2::OnBnClickedButtonPreviewVideo)
     ON_BN_CLICKED(IDC_BTN_FLUSH, &CRtcDemoV2::OnBnClickedBtnFlush)
@@ -121,6 +137,9 @@ BEGIN_MESSAGE_MAP(CRtcDemoV2, CDialogEx)
     ON_CBN_SELCHANGE(IDC_COMBO_MICROPHONE, &CRtcDemoV2::OnCbnSelchangeComboMicrophone)
     ON_CBN_SELCHANGE(IDC_COMBO_PLAYOUT, &CRtcDemoV2::OnCbnSelchangeComboPlayout)
     ON_BN_CLICKED(IDC_BUTTON_MERGE, &CRtcDemoV2::OnBnClickedButtonMerge)
+    ON_BN_CLICKED(IDC_BUTTON_SEND_MSG, &CRtcDemoV2::OnBnClickedButtonSendMsg)
+    ON_CBN_SELCHANGE(IDC_COMBO_LOCAL_ROTATION, &CRtcDemoV2::OnCbnSelchangeComboLocalRotate)
+    ON_CBN_SELCHANGE(IDC_COMBO_REMOTE_ROTATION, &CRtcDemoV2::OnCbnSelchangeComboRemoteRotate)
 END_MESSAGE_MAP()
 
 
@@ -139,6 +158,8 @@ void CRtcDemoV2::OnDestroy()
     // 释放 RTC SDK 资源
     if (_rtc_room_interface) {
         StopPublish();
+        // 注意在调用 LeaveRoom 之前，用户需确保sdk的回调接口已处理并返回,
+        // 否则 LeaveRoom 容易阻塞。
         _rtc_room_interface->LeaveRoom();
         qiniu_v2::QNRoomInterface::DestroyRoomInterface(_rtc_room_interface);
         _rtc_room_interface = nullptr;
@@ -227,12 +248,27 @@ void CRtcDemoV2::WriteConfigFile()
 
 void CRtcDemoV2::InitUI()
 {
+    GetDlgItem(IDC_BUTTON_SEND_MSG)->EnableWindow(FALSE);
+    GetDlgItem(IDC_COMBO_LOCAL_ROTATION)->EnableWindow(FALSE);
+    GetDlgItem(IDC_COMBO_REMOTE_ROTATION)->EnableWindow(FALSE);
+    ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_ROTATION))->InsertString(-1, utf2unicode("0").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_ROTATION))->InsertString(-1, utf2unicode("90").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_ROTATION))->InsertString(-1, utf2unicode("180").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_ROTATION))->InsertString(-1, utf2unicode("270").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_ROTATION))->SetCurSel(0);
+
+    ((CComboBox *)GetDlgItem(IDC_COMBO_REMOTE_ROTATION))->InsertString(-1, utf2unicode("0").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_REMOTE_ROTATION))->InsertString(-1, utf2unicode("90").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_REMOTE_ROTATION))->InsertString(-1, utf2unicode("180").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_REMOTE_ROTATION))->InsertString(-1, utf2unicode("270").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_REMOTE_ROTATION))->SetCurSel(0);
+
     _wnd_status_bar.Create(WS_CHILD | WS_VISIBLE | SBT_OWNERDRAW, CRect(0, 0, 0, 0), this, 0);
     RECT rc;
     GetWindowRect(&rc);
     int strPartDim[3] = { rc.right / 5, rc.right / 5 * 3, -1 };
     _wnd_status_bar.SetParts(3, strPartDim);
-    //设置状态栏文本 
+    // 设置状态栏文本 
     _wnd_status_bar.SetText(_T("通话时长：00:00::00"), 0, 0);
     _wnd_status_bar.SetText(_T("连麦状态"), 1, 0);
     _wnd_status_bar.SetText(utf2unicode(GetAppVersion(__DATE__, __TIME__)).c_str(), 2, 0);
@@ -245,7 +281,7 @@ void CRtcDemoV2::InitUI()
 
     // 初始化用户列表控件
     _user_list_ctrl.SetExtendedStyle(LVS_EX_FULLROWSELECT);
-    _user_list_ctrl.InsertColumn(0, _T("用户 ID"), LVCFMT_LEFT, 100, 0);    //设置列
+    _user_list_ctrl.InsertColumn(0, _T("用户 ID"), LVCFMT_LEFT, 100, 0);    // 设置列
     _user_list_ctrl.InsertColumn(1, _T("用户发布流状态"), LVCFMT_LEFT, 350, 1);
 
     // 初始化视频采集设备 combobox
@@ -335,6 +371,30 @@ std::tuple<int, int> CRtcDemoV2::FindBestVideoSize(const qiniu_v2::CameraCapabil
     return std::make_tuple(dest_width, dest_height);
 }
 
+/**
+ * 关于错误异常的相关处理，都应在相应的回调中完成; 需要处理的错误码及建议处理逻辑如下:
+ *
+ *【TOKEN相关】
+ * 1. Err_Token_Error 表示您提供的房间 token 不符合七牛 token 签算规则,
+ *    详情请参考【服务端开发说明 RoomToken 签发服务】 https://doc.qnsdk.com/rtn/docs/server_overview#1，
+ *    在 OnJoinResult 回调中暴露；
+ * 2. Err_Token_Expired 表示您的房间 token 过期, 需要重新生成 token 再加入，在 OnJoinResult 回调中暴露；
+ * 3. Err_ReconnToken_Error 表示你重新进入房间 token 错误，需要注意网络质量，请务必调用 LeaveRoom 后重新进入，
+ *    在 OnJoinResult 回调中暴露；
+ *
+ *【房间设置相关】以下情况可以与您的业务服务开发确认具体设置
+ * 1. Err_Room_Full 当房间已加入人数超过每个房间的人数限制触发，请确认后台服务的设置，在 OnJoinResult 回调中暴露；
+ * 2. Err_User_Already_Exist 后台如果配置为开启【禁止自动踢人】,则同一用户重复加入/未
+ *    正常退出再加入会触发此错误,您的业务可根据实际情况选择配置，在 OnJoinResult 回调中暴露；
+ * 3. Err_No_Permission 用户对于特定操作，如合流需要配置权限，禁止出现未授权的用户操作，在 OnKickoutResult 回调中暴露；
+ * 4. Err_Room_Closed 房间已被管理员关闭，在 OnJoinResult 回调中暴露；
+ * 5. Err_User_Not_Exist 用户不存在，这里要注意被踢用户是否在房间内，在 OnKickoutResult 回调中暴露；
+ *
+ *【其他错误】
+ * 1. Err_Invalid_Parameter 服务交互参数错误，请注意信令参数设置，在 OnJoinResult、OnPublishTracksResult、OnKickoutResult 回调中暴露；
+ * 2. Err_Multi_Master_AV 请确定对于音频/视频 Track，分别最多只能有一路为 master，在 OnPublishTracksResult 回调中暴露；
+ */
+
 void CRtcDemoV2::OnJoinResult(
     int error_code_,
     const string& error_str_,
@@ -342,6 +402,7 @@ void CRtcDemoV2::OnJoinResult(
     const qiniu_v2::TrackInfoList& tracks_vec_,
     bool reconnect_flag_)
 {
+    wchar_t buff[1024] = { 0 };
     GetDlgItem(IDC_BUTTON_LOGIN)->EnableWindow(TRUE);
 
     _start_tp = chrono::steady_clock::now();
@@ -402,18 +463,58 @@ void CRtcDemoV2::OnJoinResult(
         if (1 == ((CButton*)GetDlgItem(IDC_CHECK_MERGE))->GetCheck()) {
             CreateCustomMergeJob();
         }
+        GetDlgItem(IDC_BUTTON_SEND_MSG)->EnableWindow(TRUE);
+        GetDlgItem(IDC_COMBO_LOCAL_ROTATION)->EnableWindow(TRUE);
 
     } else {
-        _wnd_status_bar.SetText((_T("登录失败：") + utf2unicode(error_str_)).c_str(), 1, 0);
+        switch (error_code_) {
+        case Err_Token_Error:
+            _snwprintf(buff, 1024, _T("登录失败，error code:%d, error msg:%s"),
+                error_code_, utf2unicode("RoomToken 错误,请检查后从新生成再加入房间").c_str());
+            break;
+        case Err_Token_Expired:
+            _snwprintf(buff, 1024, _T("登录失败，error code:%d, error msg:%s"),
+                error_code_, utf2unicode("roomToken 过期").c_str());
+            break;
+        case Err_Room_Closed:
+            _snwprintf(buff, 1024, _T("登录失败，error code:%d, error msg:%s"),
+                error_code_, utf2unicode("房间已被管理员关闭").c_str());
+            break;
+        case Err_Room_Full:
+            _snwprintf(buff, 1024, _T("登录失败，error code:%d, error msg:%s"),
+                error_code_, utf2unicode("房间人数已满").c_str());
+            break;
+        case Err_User_Already_Exist:
+            _snwprintf(buff, 1024, _T("登录失败，error code:%d, error msg:%s"),
+                error_code_, utf2unicode("不允许同一用户重复进入").c_str());
+            break;
+        case Err_ReconnToken_Error:
+            _snwprintf(buff, 1024, _T("登录失败，error code:%d, error msg:%s"),
+                error_code_, utf2unicode("重新进入房间超时，注意网络质量").c_str());
+            break;
+        case Err_Room_Not_Exist:
+            _snwprintf(buff, 1024, _T("登录失败，error code:%d, error msg:%s"),
+                error_code_, utf2unicode("房间不存在，请先确认房间是否已创建").c_str());
+            break;
+        case Err_Invalid_Parameter:
+            _snwprintf(buff, 1024, _T("登录失败，error code:%d, error msg:%s"),
+                error_code_, utf2unicode("服务交互参数错误").c_str());
+            break;
+        default:
+            break;
+        }
+        _wnd_status_bar.SetText(buff, 1, 0);
         SetDlgItemText(IDC_BUTTON_LOGIN, _T("登录"));
-
-        // ReJoin
+        // ReJoin，demo 这边针对异常做了重新连接功能，
+        // 客户可以根据自己需要做相应的异常处理或者重新连接功能。
         PostMessage(WM_COMMAND, MAKEWPARAM(IDC_BUTTON_LOGIN, BN_CLICKED), NULL);
     }
 }
 
 void CRtcDemoV2::OnLeave(int error_code_, const string& error_str_, const string& user_id_)
 {
+    // 用户被踢、同一用户名登录同一房间或者 closeroom 会触发此消息，
+    // client 收到这个消息需主动断开连接，且不要去重连
     wchar_t buff[1024] = { 0 };
     _snwprintf(
         buff, 
@@ -475,8 +576,18 @@ void CRtcDemoV2::OnPublishTracksResult(int error_code_,
     if (0 == error_code_) {
         _snwprintf(buff, 1024, _T("本地流发布成功，流数量：%d"), track_info_list_.size());
     } else {
-        _snwprintf(buff, 1024, _T("本地流发布失败，error code:%d, error msg:%s"), 
-            error_code_, utf2unicode(error_str_).c_str());
+        switch (error_code_) {
+        case Err_Invalid_Parameter:
+            _snwprintf(buff, 1024, _T("本地流发布失败，error code:%d, error msg:%s"),
+                error_code_, utf2unicode("服务交互参数错误").c_str());
+            break;
+        case Err_Multi_Master_AV:
+            _snwprintf(buff, 1024, _T("本地流发布失败，error code:%d, error msg:%s"),
+                error_code_, utf2unicode("请查看是否加入房间，并确定对于音频/视频 Track，分别只能有一路为 master").c_str());
+            break;
+        default:
+            break;
+        }
     }
     // 释放 SDK 内部资源
     for (auto&& itor : track_info_list_)
@@ -485,6 +596,55 @@ void CRtcDemoV2::OnPublishTracksResult(int error_code_,
     }
     _wnd_status_bar.SetText(buff, 1, 0);
     AdjustMergeStreamLayouts();
+}
+
+void CRtcDemoV2::OnUnPublishTracksResult(const qiniu_v2::TrackInfoList& track_list_)
+{
+    // 释放 SDK 内部资源
+    for (auto&& itor : track_list_){
+        itor->Release();
+    }
+}
+
+void CRtcDemoV2::OnRemoteStatisticsUpdated(const qiniu_v2::StatisticsReportList& statistics_list_)
+{
+    // 远端上行网络质量
+    wchar_t dest_buf[1024] = { 0 };
+    for (auto&& itor : statistics_list_){
+        if (itor.is_video) {
+            _snwprintf(dest_buf,
+                sizeof(dest_buf),
+                _T("用户:%s, Track Id:%s, 视频: rtt:%d, 丢包率:%0.3f"),
+                utf2unicode(itor.user_id).c_str(),
+                utf2unicode(itor.track_id).c_str(),
+                itor.out_rtt,
+                itor.video_packet_lost_rate
+            );
+        } else {
+            _snwprintf(dest_buf,
+                sizeof(dest_buf),
+                _T("用户:%s, Track Id:%s, 音频: rtt:%d, 丢包率:%0.3f"),
+                utf2unicode(itor.user_id).c_str(),
+                utf2unicode(itor.track_id).c_str(),
+                itor.out_rtt,
+                itor.audio_packet_lost_rate
+            );
+        }
+
+        TRACE(dest_buf);
+
+        int line_count = _msg_rich_edit_ctrl.GetLineCount();
+        if (line_count >= 1000) {
+            // 此控件可存储数据量有限，为避免卡顿，及时清除
+            _msg_rich_edit_ctrl.SetWindowTextW(_T(""));
+            _msg_rich_edit_ctrl.UpdateData();
+            _msg_rich_edit_ctrl.Invalidate();
+        }
+        _msg_rich_edit_ctrl.SetSel(-1, -1);
+        _msg_rich_edit_ctrl.ReplaceSel(_T("\n"));
+        _msg_rich_edit_ctrl.ReplaceSel(dest_buf);
+        _msg_rich_edit_ctrl.PostMessage(WM_VSCROLL, SB_BOTTOM, 0);
+    }
 }
 
 void CRtcDemoV2::OnSubscribeTracksResult(int error_code_, 
@@ -521,12 +681,21 @@ void CRtcDemoV2::OnSubscribeTracksResult(int error_code_,
         }
     }
     if (0 == error_code_) {
+        GetDlgItem(IDC_COMBO_REMOTE_ROTATION)->EnableWindow(TRUE);
         _snwprintf(
             buff, 
             1024, 
             _T("数据流订阅成功数量：%d，失败数量：%d"), 
             succ_num,
             failed_num
+        );
+    } else {
+        _snwprintf(
+            buff,
+            1024,
+            _T("数据流订阅失败, error code：%d，error msg:%s"),
+            error_code_,
+            utf2unicode(error_str_).c_str()
         );
     }
     _wnd_status_bar.SetText(buff, 1, 0);
@@ -647,13 +816,16 @@ void CRtcDemoV2::OnRemoteUserLeave(const string& user_id_, int error_code_)
         utf2unicode(user_id_).c_str()
     );
     _wnd_status_bar.SetText(buff, 1, 0);
+    ((CComboBox *)GetDlgItem(IDC_COMBO_REMOTE_ROTATION))->SetCurSel(0);
+    GetDlgItem(IDC_COMBO_REMOTE_ROTATION)->EnableWindow(FALSE);
 }
 
+// 踢人结果通知
 void CRtcDemoV2::OnKickoutResult(const std::string& kicked_out_user_id_, 
     int error_code_, const std::string& error_str_)
 {
     lock_guard<recursive_mutex> lck(_mutex);
-
+    
     auto itor = std::find(_user_list.begin(), _user_list.end(), kicked_out_user_id_);
     if (itor != _user_list.end()) {
         _user_list.erase(itor);
@@ -668,14 +840,40 @@ void CRtcDemoV2::OnKickoutResult(const std::string& kicked_out_user_id_,
             utf2unicode(kicked_out_user_id_).c_str()
         );
     } else {
-        _snwprintf(
-            buff,
-            1024,
-            _T("踢出用户：%s 失败！error code:%d, error msg:%s"),
-            utf2unicode(kicked_out_user_id_).c_str(),
-            error_code_,
-            utf2unicode(error_str_).c_str()
-        );
+        switch (error_code_) {
+        case Err_User_Not_Exist:
+            _snwprintf(
+                buff,
+                1024,
+                _T("踢出用户：%s 失败！error code:%d, error msg:%s"),
+                utf2unicode(kicked_out_user_id_).c_str(),
+                error_code_,
+                utf2unicode("被踢用户不存在").c_str()
+            );
+            break;
+        case Err_No_Permission:
+            _snwprintf(
+                buff,
+                1024,
+                _T("踢出用户：%s 失败！error code:%d, error msg:%s"),
+                utf2unicode(kicked_out_user_id_).c_str(),
+                error_code_,
+                utf2unicode("请检查用户是否有踢人权限").c_str()
+            );
+            break;
+        case Err_Invalid_Parameter:
+            _snwprintf(
+                buff,
+                1024,
+                _T("踢出用户：%s 失败！error code:%d, error msg:%s"),
+                utf2unicode(kicked_out_user_id_).c_str(),
+                error_code_,
+                utf2unicode("服务交互参数错误").c_str()
+            );
+            break;
+        default:
+            break;
+        }
     }
     _wnd_status_bar.SetText(buff, 1, 0);
 }
@@ -717,7 +915,7 @@ void CRtcDemoV2::OnStatisticsUpdated(const qiniu_v2::StatisticsReport& statistic
             statistics_.audio_packet_lost_rate
         );
     }
-    //TRACE(utf2unicode(dest_buf).c_str());
+
     TRACE(dest_buf);
 
     int line_count = _msg_rich_edit_ctrl.GetLineCount();
@@ -733,12 +931,20 @@ void CRtcDemoV2::OnStatisticsUpdated(const qiniu_v2::StatisticsReport& statistic
     _msg_rich_edit_ctrl.PostMessage(WM_VSCROLL, SB_BOTTOM, 0);
 }
 
+void CRtcDemoV2::OnReceiveMessage(const qiniu_v2::CustomMessageList& custom_message_)
+{
+    // 接收远端自定义消息
+    for (auto&& itor : custom_message_){
+        _dlg_msg.OnReceiveMessage(itor.msg_sendid, utf8_to_string(itor.msg_text));
+    }
+}
+
 void CRtcDemoV2::OnAudioPCMFrame(const unsigned char* audio_data_, 
     int bits_per_sample_, int sample_rate_, size_t number_of_channels_, 
     size_t number_of_frames_, const std::string& user_id_)
 {
     if (bits_per_sample_ / 8 == sizeof(int16_t)) {
-        //ASSERT(bits_per_sample_ / 8 == sizeof(int16_t));
+        // ASSERT(bits_per_sample_ / 8 == sizeof(int16_t));
         // 可以借助以下代码计算音量的实时分贝值
         auto level = ProcessAudioLevel(
             (int16_t*)audio_data_,
@@ -801,8 +1007,30 @@ void CRtcDemoV2::OnVideoFramePreview(const unsigned char* raw_data_, int data_le
 void CRtcDemoV2::OnBnClickedButtonLogin()
 {
     // TODO: Add your control notification handler code here
+    // 设置画面裁剪和缩放参数，在 JoinRoom 之前设置。
+    if (1 == ((CButton*)GetDlgItem(IDC_CHECK_CLIP))->GetCheck()) {
+        int cropX = GetDlgItemInt(IDC_EDIT_CLIP_X, NULL, 0);
+        int cropY = GetDlgItemInt(IDC_EDIT_CLIP_Y, NULL, 0);
+        int width = GetDlgItemInt(IDC_EDIT_CLIP_WIDTH, NULL, 0);
+        int height = GetDlgItemInt(IDC_EDIT_CLIP_HEIGHT, NULL, 0);
+        _rtc_video_interface->SetCropAndScale(qiniu_v2::tst_Camera, qiniu_v2::p_Crop, true, cropX, cropY, width, height);
+    }
+    else {
+        _rtc_video_interface->SetCropAndScale(qiniu_v2::tst_Camera, qiniu_v2::p_Crop, false, 0, 0, 0, 0);
+    }
+
+    if (1 == ((CButton*)GetDlgItem(IDC_CHECK_SCALE))->GetCheck()) {
+        int width = GetDlgItemInt(IDC_EDIT_SCALE_WIDTH, NULL, 0);
+        int height = GetDlgItemInt(IDC_EDIT_SCALE_HEIGHT, NULL, 0);
+        _rtc_video_interface->SetCropAndScale(qiniu_v2::tst_Camera, qiniu_v2::p_Scale, true, 0, 0, width, height);
+    }
+    else {
+        _rtc_video_interface->SetCropAndScale(qiniu_v2::tst_Camera, qiniu_v2::p_Scale, false, 0, 0, 0, 0);
+    }
+
     CString btn_str;
     GetDlgItemText(IDC_BUTTON_LOGIN, btn_str);
+    // 登录房间
     if (btn_str.CompareNoCase(_T("登录")) == 0) {
         GetDlgItemText(IDC_EDIT_APPID, _app_id);
         GetDlgItemText(IDC_EDIT_ROOM_ID, _room_name);
@@ -816,17 +1044,18 @@ void CRtcDemoV2::OnBnClickedButtonLogin()
         GetDlgItem(IDC_BUTTON_LOGIN)->SetWindowText(_T("登录中"));
         GetDlgItem(IDC_BUTTON_LOGIN)->EnableWindow(FALSE);
 
-        //向 AppServer 获取 token 
+        // 向 AppServer 获取 token 
         _room_token.clear();
-        int ret = GetRoomToken(
+        int ret = GetRoomToken_s(
             unicode2utf(_app_id.GetBuffer()),
             unicode2utf(_room_name.GetBuffer()),
-            unicode2utf(_user_id.GetBuffer()), _room_token);
+            unicode2utf(_user_id.GetBuffer()),
+            "api-demo.qnsdk.com", 5, _room_token);
         if (ret != 0) {
             CString msg_str;
             msg_str.Format(_T("获取房间 token 失败，请检查您的网络是否正常！Err:%d"), ret);
             _wnd_status_bar.SetText(msg_str.GetBuffer(), 1, 0);
-            //MessageBox(_T("获取房间 token 失败，请检查您的网络是否正常！"));
+            // MessageBox(_T("获取房间 token 失败，请检查您的网络是否正常！"));
             GetDlgItem(IDC_BUTTON_LOGIN)->SetWindowText(_T("登录"));
             GetDlgItem(IDC_BUTTON_LOGIN)->EnableWindow(TRUE);
 
@@ -857,11 +1086,25 @@ void CRtcDemoV2::OnBnClickedButtonLogin()
         }
         _rtc_room_interface->LeaveRoom();
 
+        //退出时，远端画面旋转重置
+        for (auto&& itor : _remote_tracks_map) {
+            if (itor.second->track_info_ptr->GetKind().compare("video") == 0) {
+                if (_rtc_video_interface) {
+                    _rtc_video_interface->SetVideoRotation(itor.first, qiniu_v2::VideoRotation::kVideoRotation_0);
+                }
+            }
+        }
+
         SetDlgItemText(IDC_BUTTON_LOGIN, _T("登录"));
         _wnd_status_bar.SetText(_T("当前未登录房间！"), 1, 0);
         _user_list_ctrl.DeleteAllItems();
         ((CButton*)GetDlgItem(IDC_CHECK_MUTE_AUDIO))->SetCheck(0);
         ((CButton*)GetDlgItem(IDC_CHECK_MUTE_VIDEO))->SetCheck(0);
+        GetDlgItem(IDC_BUTTON_SEND_MSG)->EnableWindow(FALSE);
+        GetDlgItem(IDC_COMBO_LOCAL_ROTATION)->EnableWindow(FALSE);
+        GetDlgItem(IDC_COMBO_REMOTE_ROTATION)->EnableWindow(FALSE);
+        ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_ROTATION))->SetCurSel(0);
+        ((CComboBox *)GetDlgItem(IDC_COMBO_REMOTE_ROTATION))->SetCurSel(0);
 
         _remote_tracks_map.clear();
 
@@ -1009,6 +1252,7 @@ CHECK_CAMERA:
             }
             ++itor;
         }
+        // 用户需根据摄像头采集能力集，设置适合自己的图像分辨率、帧率和码率。
         auto camera_size = FindBestVideoSize(_camera_dev_map[video_dev_id].capability_vec);
         auto video_track_ptr = qiniu_v2::QNTrackInfo::CreateVideoTrackInfo(
             video_dev_id,
@@ -1062,6 +1306,7 @@ CHECK_AUDIO:
     }
 CHECK_EXTERNAL:
     if (1 == ((CButton*)GetDlgItem(IDC_CHECK_IMPORT_RAW_DATA))->GetCheck()) {
+        // 这里需要设置的是外部视频源对应的分辨率和帧率
         auto video_track_ptr = qiniu_v2::QNTrackInfo::CreateVideoTrackInfo(
             "",
             EXTERNAL_TAG,
@@ -1082,7 +1327,7 @@ CHECK_EXTERNAL:
             thread([]() {
                 AfxMessageBox(_T("全部发布失败，请检查您的网络状态！"));
             }).detach();
-        } else if (ret == Err_Tracks_Publish_All_Failed) {
+        } else if (ret == Err_Tracks_Publish_Partial_Failed) {
             thread([]() {
                 AfxMessageBox(_T("部分发布失败，请检查您的设备状态是否可用？"));
             }).detach();
@@ -1488,7 +1733,7 @@ void CRtcDemoV2::CreateCustomMergeJob()
     job_desc.bitrate        = _merge_config.job_bitrate;
     job_desc.min_bitrate    = _merge_config.job_min_bitrate;
     job_desc.max_bitrate    = _merge_config.job_max_bitrate;
-    job_desc.stretch_mode   = qiniu_v2::ASPECT_FILL;
+    job_desc.stretch_mode = (qiniu_v2::MergeStretchMode)(_merge_config.job_stretch_mode);
 
     qiniu_v2::MergeLayer background;
     background.layer_url    = _merge_config.background_url;
@@ -1575,7 +1820,7 @@ void CRtcDemoV2::AdjustMergeStreamLayouts()
     }
 
 
-    // 自定义合流，根据界面配置使用一个本地或者远端track 
+    // 自定义合流，根据界面配置使用一个本地或者远端 track 
     if (1 == ((CButton*)GetDlgItem(IDC_CHECK_MERGE))->GetCheck()) {
 
         qiniu_v2::MergeOptInfoList add_tracks_list;
@@ -1688,7 +1933,7 @@ void CRtcDemoV2::OnBnClickedBtnKickout()
             MessageBox(_T("请选中要踢出的用户！"));
             return;
         }
-        //所选择的用户当前没有发布媒体流
+        // 所选择的用户当前没有发布媒体流
         CString user_id = _user_list_ctrl.GetItemText(index, 0);
 
         if (_rtc_room_interface) {
@@ -1814,9 +2059,96 @@ afx_msg LRESULT CRtcDemoV2::OnHandleMessage(WPARAM wParam, LPARAM lParam)
     return 0;
 }
 
+afx_msg LRESULT CRtcDemoV2::OnSendMessage(WPARAM wParam, LPARAM lParam)
+{
+    if (_rtc_room_interface) {
+        LPTSTR lpMessage = (LPTSTR)lParam;
+        _bstr_t bstr("");
+        LPTSTR strTmp = lpMessage;
+        bstr = strTmp;
+        std::string strMsg = bstr;
+        list<string> users_list;
+        _rtc_room_interface->SendCustomMessage(users_list, "", string_to_utf8(strMsg));
+    }
+    return 0;
+}
+
 void CRtcDemoV2::OnBnClickedButtonMerge()
 {
     MergeDialog dlgMerge;
     dlgMerge._merge_config = _merge_config;
     dlgMerge.DoModal();
+}
+
+void CRtcDemoV2::OnBnClickedButtonSendMsg()
+{
+    // TODO: 在此添加控件通知处理程序代码
+    _dlg_msg._user_id = _user_id;
+    _dlg_msg.DoModal();
+}
+
+
+void CRtcDemoV2::OnCbnSelchangeComboLocalRotate()
+{
+    // TODO: 在此添加控件通知处理程序代码
+    int rotation_sel = ((CComboBox*)GetDlgItem(IDC_COMBO_LOCAL_ROTATION))->GetCurSel();
+    qiniu_v2::VideoRotation video_rotation = qiniu_v2::VideoRotation::kVideoRotation_0;
+    switch (rotation_sel)
+    {
+    case 0:
+        video_rotation = qiniu_v2::VideoRotation::kVideoRotation_0;
+        break;
+    case 1:
+        video_rotation = qiniu_v2::VideoRotation::kVideoRotation_90;
+        break;
+    case 2:
+        video_rotation = qiniu_v2::VideoRotation::kVideoRotation_180;
+        break;
+    case 3:
+        video_rotation = qiniu_v2::VideoRotation::kVideoRotation_270;
+        break;
+    default:
+        break;
+    }
+
+    for (auto&& itor : _local_tracks_list) {
+        if (itor->GetKind().compare("video") == 0) {
+            if (_rtc_video_interface) {
+                _rtc_video_interface->SetVideoRotation(itor->GetTrackId(), video_rotation);
+            }
+        }
+    }
+}
+
+
+void CRtcDemoV2::OnCbnSelchangeComboRemoteRotate()
+{
+    // TODO: 在此添加控件通知处理程序代码
+    int rotation_sel = ((CComboBox*)GetDlgItem(IDC_COMBO_REMOTE_ROTATION))->GetCurSel();
+    qiniu_v2::VideoRotation video_rotation = qiniu_v2::VideoRotation::kVideoRotation_0;
+    switch (rotation_sel)
+    {
+    case 0:
+        video_rotation = qiniu_v2::VideoRotation::kVideoRotation_0;
+        break;
+    case 1:
+        video_rotation = qiniu_v2::VideoRotation::kVideoRotation_90;
+        break;
+    case 2:
+        video_rotation = qiniu_v2::VideoRotation::kVideoRotation_180;
+        break;
+    case 3:
+        video_rotation = qiniu_v2::VideoRotation::kVideoRotation_270;
+        break;
+    default:
+        break;
+    }
+
+    for (auto&& itor : _remote_tracks_map) {
+        if (itor.second->track_info_ptr->GetKind().compare("video") == 0) {
+            if (_rtc_video_interface) {
+                _rtc_video_interface->SetVideoRotation(itor.first, video_rotation);
+            }
+        }
+    }
 }
