@@ -25,7 +25,7 @@ namespace qiniu_v2
         kH264, // 目前仅针对 Linux SDK
     };
 
-    // 画面帧处理模式
+    // 画面帧处理模式 
     enum FrameProcessMode
     {
         p_Unknow,
@@ -375,14 +375,14 @@ namespace qiniu_v2
         // @return 成功返回 0，否则请参考错误码列表 
         virtual int InputH264Frame(H264Nal** nals_ptr_, unsigned int nals_size_, uint8_t is_key_frame_) = 0;
 
-        // 原始帧处理功能接口：裁剪和缩放，设置参数要求如下，如果设置不正确，则输出原始图像，OnVideoFrame回调接口中会有输出宽高体现
-        // @param src_capturer_source 数据源类型，目前只支持摄像头采集数据
-        // @param mode 裁剪还是缩放
-        // @param enable 开/关
-        // @param cropX 开始裁减的 X 坐标点，原点为左上角，必须落在原图之内
-        // @param cropY 开始裁减的 Y 坐标点，原点为左上角，必须落在原图之内
-        // @param dstWidth 目标图像宽度，必须为4的整数倍，如果是裁剪模式，cropX和cropY，裁剪图像必须在原始图像之内
-        // @param dstHeight 目标图像高度，必须为4的整数倍，如果是裁剪模式，cropX和cropY，裁剪图像必须在原始图像之内
+        // 原始帧处理功能接口：裁剪和缩放，设置参数要求如下，如果设置不正确，则输出原始图像，OnVideoFrame回调接口中会有输出宽高体现 
+        // @param src_capturer_source 数据源类型，目前只支持摄像头采集数据 
+        // @param mode 裁剪还是缩放 
+        // @param enable 开/关 
+        // @param cropX 开始裁减的 X 坐标点，原点为左上角，必须落在原图之内 
+        // @param cropY 开始裁减的 Y 坐标点，原点为左上角，必须落在原图之内 
+        // @param dstWidth 目标图像宽度，必须为4的整数倍，如果是裁剪模式，cropX和cropY，裁剪图像必须在原始图像之内 
+        // @param dstHeight 目标图像高度，必须为4的整数倍，如果是裁剪模式，cropX和cropY，裁剪图像必须在原始图像之内 
         virtual void SetCropAndScale(
             qiniu_v2::TrackSourceType src_capturer_source,
             FrameProcessMode mode,
