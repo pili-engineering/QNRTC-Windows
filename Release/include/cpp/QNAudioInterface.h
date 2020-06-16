@@ -207,6 +207,12 @@ namespace qiniu_v2 {
         // @brief 测试阶段，慎用 
         virtual int EnableAec(bool enable_) = 0;
 
+        //开启软件回音消除功能，在有些机器上效果不明显，需要强制降采样为16K才有效果，
+        //开启可能会降低音质，内部是默认开启，如果对回音消除没有需求，但对音质有需求，需要禁用。
+        // @param enable_ 是否开启， true or false
+        // @return 目前阶段全部返回 0
+        virtual int ForceLowSamplerate(bool enable_) = 0;
+
     protected:
         virtual ~QNAudioInterface() {}
     };

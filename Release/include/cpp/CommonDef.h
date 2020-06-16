@@ -134,10 +134,25 @@ namespace qiniu_v2 {
         int         video_frame_rate = 0;           // 视频帧率 
         int         video_bitrate = 0;              // 码率，单位：bps
         float       video_packet_lost_rate = 0.0f;  // 丢包率 
+        int64_t     out_rtt = 0;                    // 数据从发送到接收端的往返延迟
+        int         network_grade;                  // 网络质量  1 - 优 2 - 良 3 - 中等 4 - 差
     };
 
     typedef list<MergeOptInfo> MergeOptInfoList;
     typedef list<UserInfo> UserInfoList;
+
+    //自定义消息接收回调信息
+    struct  CustomMessage
+    {
+        std::string msg_id;        //消息唯一id
+        std::string msg_sendid;    //消息发送者的user id
+        std::string msg_text;      //消息内容
+        int         msg_stamp;     //消息时间戳
+    };
+    
+    typedef list<CustomMessage> CustomMessageList;
+
+    typedef list<StatisticsReport> StatisticsReportList;
 
     class QNTrackInfo;
     typedef list<QNTrackInfo*> TrackInfoList;

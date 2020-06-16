@@ -54,6 +54,9 @@
     <ClInclude Include="MergeDialog.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="MessageDialog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RtcDemo.cpp">
@@ -75,6 +78,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="MergeDialog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MessageDialog.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
