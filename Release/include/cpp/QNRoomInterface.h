@@ -115,18 +115,18 @@ namespace qiniu_v2 {
                 const StatisticsReport& statistics_
             ) = 0;
             
-            //自定义消息回调。
+            //自定义消息回调。 
             virtual void OnReceiveMessage(
                 const CustomMessageList& custom_message_
             ) = 0;
 
-            // 本地 Tracks 取消发布结果异步通知
+            // 本地 Tracks 取消发布结果异步通知 
             // @param track_list_ 本地发布的 Tracks 列表 
             virtual void OnUnPublishTracksResult(
                 const TrackInfoList& track_list_
             ) = 0;
 
-            //远端音视频质量参数回调
+            //远端音视频质量参数回调 
             virtual void OnRemoteStatisticsUpdated(
                 const StatisticsReportList& statistics_list_
             ) = 0;
@@ -269,11 +269,11 @@ namespace qiniu_v2 {
         // @return 用户 Id
         virtual const string& GetLocalUserId() = 0;
         
-        //发送自定义消息
-        //@param users 目标用户列表，为空时则给房间中的所有人发消息（注意：不能填null）
-        //@param messageId 消息ID，可以为空（注意：不能填null）
-        //@param message 消息内容（注意：不能填null，不支持发送空消息，入参前需转成utf8格式）
-        // @return 0:操作成功；其它请参考错误码列表。
+        //发送自定义消息 
+        //@param users 目标用户列表，为空时则给房间中的所有人发消息（注意：不能填null） 
+        //@param messageId 消息ID，可以为空（注意：不能填null） 
+        //@param message 消息内容（注意：不能填null，不支持发送空消息，入参前需转成utf8格式） 
+        // @return 0:操作成功；其它请参考错误码列表。 
         virtual int SendCustomMessage(const list<string>& users_list_, const string& message_id, const string& message_) = 0;
 
     protected:
