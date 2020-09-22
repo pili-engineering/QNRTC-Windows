@@ -185,6 +185,14 @@ namespace qiniu_v2 {
                 const std::string& error_str_
             ) = 0;
 
+            // 当远端用户进入重连时会触发此回调 
+            // @param remote_user_id_ 远端用户 id 
+            virtual void OnRemoteUserReconnecting(const std::string& remote_user_id_) = 0;
+
+            // 当远端用户重连成功时会触发此回调 
+            // @param remote_user_id_ 远端用户 id 
+            virtual void OnRemoteUserReconnected(const std::string& remote_user_id_) = 0;
+
         protected:
             virtual ~QNRoomListener() {}
         };
@@ -349,6 +357,14 @@ namespace qiniu_v2 {
         // @param job_id 单路转推任务 id 
         // @return 0:操作成功，具体转推结果请通过观看旁路直播进行查看 
         virtual int StopForwardJob(const string& job_id) = 0;
+
+        // 开启数据统计
+        // @param period_ms 每次统计间隔时间，单位毫秒 
+        virtual void EnableStatistics(int period_ms) = 0;
+
+        // 设置 dns 域名解析服务器地址 需要在 JoinRoom 之前调用 
+        // @param url_ dns 服务器地址 
+        virtual void SetDnsServerUrl(const std::string& url_) = 0;
 
     protected:
         virtual ~QNRoomInterface() {}

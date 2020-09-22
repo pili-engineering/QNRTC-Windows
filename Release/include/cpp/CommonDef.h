@@ -169,6 +169,7 @@ namespace qiniu_v2 {
         bool               audio_only;          // 是否为是否只转推音频 
         std::string        job_id;              // 单路转推任务 id，由客户端设置，不可为空，若已存在相同 id 的 job，返回错误 
         std::string        publish_url;         // 转推地址 
+        bool               is_internal = true;  // 是否使用七牛内部转推，默认为 true 
     };
 
     typedef list<MergeOptInfo> MergeOptInfoList;
