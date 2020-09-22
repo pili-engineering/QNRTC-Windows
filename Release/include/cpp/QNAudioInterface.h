@@ -96,6 +96,73 @@ namespace qiniu_v2 {
                 const std::string& device_guid_
             ) = 0;
 
+            // 放置音频自定义数据回调 
+            // @param extra_data_ 用户自定义数据 
+            // @param extra_data_max_size_ 用户可以放置到 extra_data_ 的最大字节数 
+            // @param track_id_ 所属 Track Id，自己或者远端用户发布的 Track 
+            // @return 返回放置到 extra_data_ 中的数据大小，没有添加则返回 0 
+            virtual int OnPutExtraData(
+                unsigned char* extra_data_,
+                int extra_data_max_size_,
+                const std::string& track_id_
+            ) = 0;
+
+            // 设置加密后最大字节数 
+            // 配合 OnEncrypt 使用 
+            // @param frame_size_ 未加密数据大小 
+            // @param track_id_ 所属 Track Id，自己或者远端用户发布的 Track 
+            // @return 需要的最大字节数 
+            virtual int OnSetMaxEncryptSize(
+                int frame_size_,
+                const std::string& track_id_
+            ) = 0;
+
+            // 加密回调接口 
+            // @param frame_ 加密前的数据 
+            // @param frame_size_ 加密前的数据大小 
+            // @param encrypted_frame_ 加密后的数据 
+            // @param track_id_ 所属 Track Id，自己或者远端用户发布的 Track 
+            // @return 加密后的数据大小 
+            virtual int OnEncrypt(
+                const unsigned char* frame_,
+                int frame_size_,
+                unsigned char* encrypted_frame_,
+                const std::string& track_id_
+            ) = 0;
+
+            // 接收音频自定义数据回调 
+            // @param extra_data_ 接收的用户自定义数据 
+            // @param extra_data_size_ 自定义数据大小 
+            // @param track_id_ 所属 Track Id，自己或者远端用户发布的 Track 
+            virtual void OnGetExtraData(
+                const unsigned char* extra_data_,
+                int extra_data_size_,
+                const std::string& track_id_
+            ) = 0;
+
+            // 设置解密后最大字节数 
+            // 配合 OnDecrypt 使用 
+            // @param encrypted_frame_size_ 加密后数据大小 
+            // @param track_id_ 所属 Track Id，自己或者远端用户发布的 Track 
+            // @return 需要的最大字节数 
+            virtual int OnSetMaxDecryptSize(
+                int encrypted_frame_size_,
+                const std::string& track_id_
+            ) = 0;
+
+            // 解密回调接口 
+            // @param encrypted_frame_ 加密后的数据 
+            // @param encrypted_size_ 加密后的数据大小 
+            // @param frame_ 解密后的数据 
+            // @param track_id_ 所属 Track Id，自己或者远端用户发布的 Track 
+            // @return 解密后的数据大小 
+            virtual int OnDecrypt(
+                const unsigned char* encrypted_frame_,
+                int encrypted_size_,
+                unsigned char* frame_,
+                const std::string& track_id_
+            ) = 0;
+
         protected:
             virtual ~QNAudioListener() {}
         };
@@ -207,11 +274,19 @@ namespace qiniu_v2 {
         // @brief 测试阶段，慎用 
         virtual int EnableAec(bool enable_) = 0;
 
-        //开启软件回音消除功能，在有些机器上效果不明显，需要强制降采样为 16K 才有效果， 
-        //开启可能会降低音质，内部是默认开启，如果对回音消除没有需求，但对音质有需求，需要禁用。 
+        // 开启软件回音消除功能，在有些机器上效果不明显，需要强制降采样为 16K 才有效果， 
+        // 开启可能会降低音质，内部是默认开启，如果对回音消除没有需求，但对音质有需求，需要禁用。 
         // @param enable_ 是否开启， true or false 
         // @return 目前阶段全部返回 0 
         virtual int ForceLowSamplerate(bool enable_) = 0;
+
+        // 是否开启本地音频 track 编码后数据回调 
+        // @param enable_ 是否开启，true or false，当为 true 时，通过 OnEncrypt 接口回调 
+        virtual void EnableLocalAudioPacketCallBack(bool enable_) = 0;
+
+        // 是否开启远端音频 track 编码后数据回调 
+        // @param enable_ 是否开启，true or false，当为 true 时，通过 OnDecrypt 接口回调 
+        virtual void EnableRemoteAudioPacketCallBack(bool enbale_) = 0;
 
     protected:
         virtual ~QNAudioInterface() {}

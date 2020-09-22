@@ -99,6 +99,7 @@ BOOL CRtcDemoV2::OnInitDialog()
     
     _rtc_room_interface = qiniu_v2::QNRoomInterface::ObtainRoomInterface();
     _rtc_room_interface->SetRoomListener(this);
+    _rtc_room_interface->EnableStatistics(1000);
 
     _rtc_video_interface = _rtc_room_interface->ObtainVideoInterface();
     _rtc_video_interface->SetVideoListener(this);
@@ -143,6 +144,7 @@ BEGIN_MESSAGE_MAP(CRtcDemoV2, CDialogEx)
     ON_CBN_SELCHANGE(IDC_COMBO_SUBSCRIBE_PROFILE, &CRtcDemoV2::OnCbnSelchangeComboSubscribeProfile)
     ON_BN_CLICKED(IDC_BUTTON_SIMULCAST, &CRtcDemoV2::OnBnClickedButtonSimulcast)
     ON_BN_CLICKED(IDC_BUTTON_FORWARD, &CRtcDemoV2::OnBnClickedButtonForward)
+    ON_BN_CLICKED(IDC_BUTTON_EXTRA_DATA, &CRtcDemoV2::OnBnClickedButtonExtraData)
 END_MESSAGE_MAP()
 
 
@@ -255,6 +257,7 @@ void CRtcDemoV2::InitUI()
     GetDlgItem(IDC_COMBO_LOCAL_ROTATION)->EnableWindow(FALSE);
     GetDlgItem(IDC_COMBO_REMOTE_ROTATION)->EnableWindow(FALSE);
     GetDlgItem(IDC_BUTTON_FORWARD)->EnableWindow(FALSE);
+    GetDlgItem(IDC_BUTTON_EXTRA_DATA)->EnableWindow(TRUE);
     ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_ROTATION))->InsertString(-1, utf2unicode("0").c_str());
     ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_ROTATION))->InsertString(-1, utf2unicode("90").c_str());
     ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_ROTATION))->InsertString(-1, utf2unicode("180").c_str());
@@ -277,7 +280,7 @@ void CRtcDemoV2::InitUI()
     } else {
         SetDlgItemText(IDC_BUTTON_SIMULCAST, _T("开启多流"));
     }
-
+    SetDlgItemText(IDC_IPADDRESS1, _T("223.5.5.5"));
     _wnd_status_bar.Create(WS_CHILD | WS_VISIBLE | SBT_OWNERDRAW, CRect(0, 0, 0, 0), this, 0);
     RECT rc;
     GetWindowRect(&rc);
@@ -426,6 +429,7 @@ void CRtcDemoV2::OnJoinResult(
         SetDlgItemText(IDC_BUTTON_LOGIN, _T("离开"));
         GetDlgItem(IDC_BUTTON_SIMULCAST)->EnableWindow(FALSE);
         GetDlgItem(IDC_BUTTON_FORWARD)->EnableWindow(TRUE);
+        GetDlgItem(IDC_BUTTON_EXTRA_DATA)->EnableWindow(FALSE);
         lock_guard<recursive_mutex> lck(_mutex);
         _user_list.clear();
         _user_list_ctrl.DeleteAllItems();
@@ -640,7 +644,7 @@ void CRtcDemoV2::OnRemoteStatisticsUpdated(const qiniu_v2::StatisticsReportList&
         if (itor.is_video) {
             _snwprintf(dest_buf,
                 sizeof(dest_buf),
-                _T("用户:%s, Track Id:%s, 视频: rtt:%d, 丢包率:%0.3f"),
+                _T("用户:%s, Track Id:%s, 视频: rtt:%I64d, 丢包率:%0.3f"),
                 utf2unicode(itor.user_id).c_str(),
                 utf2unicode(itor.track_id).c_str(),
                 itor.out_rtt,
@@ -649,7 +653,7 @@ void CRtcDemoV2::OnRemoteStatisticsUpdated(const qiniu_v2::StatisticsReportList&
         } else {
             _snwprintf(dest_buf,
                 sizeof(dest_buf),
-                _T("用户:%s, Track Id:%s, 音频: rtt:%d, 丢包率:%0.3f"),
+                _T("用户:%s, Track Id:%s, 音频: rtt:%I64d, 丢包率:%0.3f"),
                 utf2unicode(itor.user_id).c_str(),
                 utf2unicode(itor.track_id).c_str(),
                 itor.out_rtt,
@@ -833,6 +837,38 @@ void CRtcDemoV2::OnStopForwardResult(
     }
 }
 
+void CRtcDemoV2::OnRemoteUserReconnecting(const std::string& remote_user_id_)
+{
+    thread(
+        [&, remote_user_id_] {
+        wchar_t buf[512] = { 0 };
+
+        _snwprintf(buf,
+            sizeof(buf),
+            _T("%s 用户正在重连"),
+            utf2unicode(remote_user_id_).c_str()
+        );
+        AfxMessageBox(buf, MB_OK);
+    }
+    ).detach();
+}
+
+void CRtcDemoV2::OnRemoteUserReconnected(const std::string& remote_user_id_)
+{
+    thread(
+        [&, remote_user_id_] {
+        wchar_t buf[512] = { 0 };
+
+        _snwprintf(buf,
+            sizeof(buf),
+            _T("%s 用户重连成功"),
+            utf2unicode(remote_user_id_).c_str()
+        );
+        AfxMessageBox(buf, MB_OK);
+    }
+    ).detach();
+}
+
 void CRtcDemoV2::OnSubscribeTracksResult(int error_code_, 
     const std::string &error_str_, const qiniu_v2::TrackInfoList &track_info_list_)
 {
@@ -941,6 +977,10 @@ void CRtcDemoV2::OnRemoteAddTracks(const qiniu_v2::TrackInfoList& track_list_)
                     layeritor.mChooseToSub = true;
                 }
             }
+        }
+        
+        if (tmp_track_ptr->GetKind().compare("audio") == 0) {
+            _show_extra = true;
         }
         _remote_tracks_map.insert_or_assign(tmp_track_ptr->GetTrackId(), tiu);
 
@@ -1190,6 +1230,77 @@ void CRtcDemoV2::OnAudioDeviceStateChanged(
     ).detach();
 }
 
+int CRtcDemoV2::OnPutExtraData(
+    unsigned char* extra_data_,
+    int extra_data_max_size_,
+    const std::string& track_id_)
+{
+    const unsigned char tmp[32] = "QNTEST";
+    memcpy(extra_data_, tmp, strlen((char*)tmp));
+    return strlen((char*)tmp);
+}
+
+int CRtcDemoV2::OnSetMaxEncryptSize(
+    int frame_size_,
+    const std::string& track_id_)
+{
+    return frame_size_ + 32;
+}
+
+int CRtcDemoV2::OnEncrypt(
+    const unsigned char* frame_,
+    int frame_size_,
+    unsigned char* encrypted_frame_,
+    const std::string& track_id_)
+{
+    // 这里加密演示是每个字节异或 0xAA，解密时也相应异或 0xAA。
+    for (size_t i = 0; i < frame_size_; i++) {
+        encrypted_frame_[i] = frame_[i] ^ 0xAA;
+    }
+    return frame_size_;
+}
+
+void CRtcDemoV2::OnGetExtraData(
+    const unsigned char* extra_data_,
+    int extra_data_size_,
+    const std::string& track_id_)
+{
+    if (_show_extra) {
+        thread(
+            [&, extra_data_] {
+            wchar_t buf[512] = { 0 };
+
+            _snwprintf(buf,
+                sizeof(buf),
+                _T("extra data:%s"),
+                utf2unicode((LPCSTR)extra_data_).c_str()
+            );
+            AfxMessageBox(buf, MB_OK);
+        }
+        ).detach();
+        _show_extra = false;
+    }
+}
+
+int CRtcDemoV2::OnSetMaxDecryptSize(
+    int encrypted_frame_size_,
+    const std::string& track_id_)
+{
+    return encrypted_frame_size_ + 32;
+}
+
+int CRtcDemoV2::OnDecrypt(
+    const unsigned char* encrypted_frame_,
+    int encrypted_size_,
+    unsigned char* frame_,
+    const std::string& track_id_)
+{
+    for (size_t i = 0; i < encrypted_size_; i++) {
+        frame_[i] = encrypted_frame_[i] ^ 0xAA;
+    }
+    return encrypted_size_;
+}
+
 void CRtcDemoV2::OnVideoDeviceStateChanged(
     qiniu_v2::VideoDeviceState device_state_, const std::string& device_name_)
 {
@@ -1250,6 +1361,15 @@ void CRtcDemoV2::OnBnClickedButtonLogin()
     GetDlgItemText(IDC_BUTTON_LOGIN, btn_str);
     // 登录房间
     if (btn_str.CompareNoCase(_T("登录")) == 0) {
+        _show_extra = true;
+        if (_enable_encryptor_decryptor) {
+            _rtc_audio_interface->EnableLocalAudioPacketCallBack(true);
+            _rtc_audio_interface->EnableRemoteAudioPacketCallBack(true);
+            SetDlgItemText(IDC_BUTTON_EXTRA_DATA, _T("关闭数据加解密"));
+        }
+        else {
+            SetDlgItemText(IDC_BUTTON_EXTRA_DATA, _T("开启数据加解密"));
+        }
         GetDlgItemText(IDC_EDIT_APPID, _app_id);
         GetDlgItemText(IDC_EDIT_ROOM_ID, _room_name);
         GetDlgItemText(IDC_EDIT_PLAYER_ID, _user_id);
@@ -1293,8 +1413,13 @@ void CRtcDemoV2::OnBnClickedButtonLogin()
         }
 
         _wnd_status_bar.SetText(_T("获取房间 token 成功！"), 1, 0);
+        CString dns_ip;
+        GetDlgItemText(IDC_IPADDRESS1, dns_ip);
+        _rtc_room_interface->SetDnsServerUrl(unicode2utf(dns_ip.GetBuffer()));
         _rtc_room_interface->JoinRoom(_room_token);
     } else {
+        _rtc_audio_interface->EnableLocalAudioPacketCallBack(false);
+        _rtc_audio_interface->EnableRemoteAudioPacketCallBack(false);
         // 退出房间前，发布停止合流的命令
         if (_contain_admin_flag) {
             _rtc_room_interface->StopMergeStream();
@@ -1325,6 +1450,7 @@ void CRtcDemoV2::OnBnClickedButtonLogin()
         ((CComboBox *)GetDlgItem(IDC_COMBO_REMOTE_ROTATION))->SetCurSel(0);
         GetDlgItem(IDC_BUTTON_SIMULCAST)->EnableWindow(TRUE);
         GetDlgItem(IDC_BUTTON_FORWARD)->EnableWindow(FALSE);
+        GetDlgItem(IDC_BUTTON_EXTRA_DATA)->EnableWindow(TRUE);
         _remote_tracks_map.clear();
 
         KillTimer(UPDATE_TIME_DURATION_TIMER);
@@ -2447,6 +2573,7 @@ void CRtcDemoV2::OnBnClickedButtonForward()
         _custom_forward_id = "window-forward";
         qiniu_v2::ForwardOptInfo forwardInfo;
         forwardInfo.audio_only = false;
+        forwardInfo.is_internal = true;
         forwardInfo.job_id = _custom_forward_id;
         forwardInfo.publish_url = "rtmp://pili-publish.qnsdk.com/sdk-live/window-forward";
         _forward_audio_flag = false;
@@ -2471,5 +2598,22 @@ void CRtcDemoV2::OnBnClickedButtonForward()
             _rtc_room_interface->StopForwardJob(_custom_forward_id);
             _contain_forward_flag = false;
         }
+    }
+}
+
+
+void CRtcDemoV2::OnBnClickedButtonExtraData()
+{
+    // TODO: 在此添加控件通知处理程序代码IDC_BUTTON_EXTRA_DATA
+    CString btn_str;
+    GetDlgItemText(IDC_BUTTON_EXTRA_DATA, btn_str);
+    if (btn_str.CompareNoCase(_T("关闭数据加解密")) == 0) {
+        SetDlgItemText(IDC_BUTTON_EXTRA_DATA, _T("开启数据加解密"));
+        _enable_encryptor_decryptor = false;
+    } else {
+        _rtc_audio_interface->EnableLocalAudioPacketCallBack(true);
+        _rtc_audio_interface->EnableRemoteAudioPacketCallBack(true);
+        SetDlgItemText(IDC_BUTTON_EXTRA_DATA, _T("关闭数据加解密"));
+        _enable_encryptor_decryptor = true;
     }
 }
