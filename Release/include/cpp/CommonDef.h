@@ -72,6 +72,13 @@ namespace qiniu_v2 {
         SCALE_TO_FIT = 2,   // 缩放视频，使其填充满容器，可能导致拉伸变形 
     };
 
+    // 大小流对应配置
+    enum QNTrackProfile {
+        HIGH,
+        MEDIUM,
+        LOW,
+    };
+
     // 合流背景、水印配置参数 
     struct MergeLayer {
         string layer_url;       // http网络图片地址 
@@ -138,21 +145,37 @@ namespace qiniu_v2 {
         int         network_grade;                  // 网络质量  1 - 优 2 - 良 3 - 中等 4 - 差 
     };
 
-    typedef list<MergeOptInfo> MergeOptInfoList;
-    typedef list<UserInfo> UserInfoList;
-
     //自定义消息接收回调信息 
     struct  CustomMessage
     {
-        std::string msg_id;        //消息唯一id 
-        std::string msg_sendid;    //消息发送者的user id 
-        std::string msg_text;      //消息内容 
-        int         msg_stamp;     //消息时间戳 
+        std::string msg_id;        // 消息唯一id 
+        std::string msg_sendid;    // 消息发送者的user id 
+        std::string msg_text;      // 消息内容 
+        int         msg_stamp;     // 消息时间戳 
     };
-    
-    typedef list<CustomMessage> CustomMessageList;
 
+    struct QNTrackLayerSubConfig {
+        QNTrackProfile mProfile;   // 当前 profile 
+        bool mChooseToSub;         // 是否需要切换为当前的 profile 
+        bool mMaintainLayer;       // 开启后，订阅端 profile 会随网络自动切换 （暂时不支持） 
+        bool mActive;              // 当前 profile 为生效状态 
+    };
+
+    // 单路转推配置信息，通过 SDK 将参数发送到服务端 
+    // 服务端按照指定的参数进行合流并推出 RTMP 流 
+    struct ForwardOptInfo
+    {
+        list<string>       track_id_list;       // 单路转推的音频和视频的 track id，audio_only 为 true 时，只存放音频的 track id 
+        bool               audio_only;          // 是否为是否只转推音频 
+        std::string        job_id;              // 单路转推任务 id，由客户端设置，不可为空，若已存在相同 id 的 job，返回错误 
+        std::string        publish_url;         // 转推地址 
+    };
+
+    typedef list<MergeOptInfo> MergeOptInfoList;
+    typedef list<UserInfo> UserInfoList;
+    typedef list<CustomMessage> CustomMessageList;
     typedef list<StatisticsReport> StatisticsReportList;
+    typedef list<QNTrackLayerSubConfig> LayerSubConfigList;
 
     class QNTrackInfo;
     typedef list<QNTrackInfo*> TrackInfoList;
@@ -185,7 +208,8 @@ namespace qiniu_v2 {
         string camera_device_id;                // 摄像头设备 Id，仅当 source_type 为 tst_Camera 时有效 
         TrackSourceType source_type = tst_Invalid;
         unsigned long long start_tp = 0;
-
+        LayerSubConfigList  sub_layer_list;        // 订阅端多流信息 
+        bool   multi_stream_enable  = false;       // 是否支持开启多流功能 
     public:
         // 创建视频 Track 实例，用于 PublishTracks 时使用，使用完成后调用 Release 进行释放 
         // @param camera_device_id_ 摄像头设备 Id，如果不是摄像头采集的话，可为空 
@@ -196,8 +220,9 @@ namespace qiniu_v2 {
         // @param max_fps_ 最大帧率 
         // @param max_bitrate_ 最大码率，单位：bps
         // @param type_ TrackSourceType 根据具体的数据源进行制定 
-        // @param is_master_ 是否为“主”流，默认为 false；
-        //  如果需要与 v1 的接口进行互通，则将其中某一路 Track 置为 true
+        // @param is_master_ 是否为“主”流，默认为 false 
+        //  如果需要与 v1 的接口进行互通，则将其中某一路 Track 置为 true 
+        // @param multi_stream_enable_  是否开启多流功能，默认为 false； 
         // @return 成功：TrackInfo 指针，否则返回空指针；返回值需由 Release 方法释放 
         static QNTrackInfo* CreateVideoTrackInfo(
             const string& camera_device_id_,
@@ -208,7 +233,8 @@ namespace qiniu_v2 {
             int   max_fps_,
             int   max_bitrate_,
             TrackSourceType type_,
-            bool  is_master_ = false
+            bool  is_master_ = false,
+            bool  multi_stream_enable_ = false
         );
 
         // 创建音频 Track 实例，用于 PublishTracks 时使用，返回值需由开发者调用 Release 进行释放
@@ -327,6 +353,17 @@ namespace qiniu_v2 {
         {
             return start_tp;
         }
+
+        virtual LayerSubConfigList& GetLayerInfo()
+        {
+            return sub_layer_list;
+        }
+
+        virtual bool GetMultiStremState()
+        {
+            return multi_stream_enable;
+        }
+
 
     protected:
         QNTrackInfo() {}

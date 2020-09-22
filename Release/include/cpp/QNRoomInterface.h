@@ -126,9 +126,63 @@ namespace qiniu_v2 {
                 const TrackInfoList& track_list_
             ) = 0;
 
-            //远端音视频质量参数回调 
+            // 远端音视频质量参数回调 
             virtual void OnRemoteStatisticsUpdated(
                 const StatisticsReportList& statistics_list_
+            ) = 0;
+
+            // 创建合流任务结果反馈 
+            // @param job_id_ 合流任务 id 
+            // @param error_code_ 0：成功， 非 0： 失败 
+            // @param error_str_ error_code_ 非 0 时的错误描述信息 
+            virtual void OnCreateMergeResult(
+                const std::string& job_id_,
+                int error_code_,
+                const std::string& error_str_
+            ) = 0;
+
+            // 停止合流任务结果反馈 
+            // @param job_id_ 合流任务 id 
+            // @param job_iid_ iid 用于区分 id 相同时的情况，可以不用处理此字段 
+            // @param error_code_ 0：成功， 非 0： 失败 
+            // @param error_str_ error_code_ 非 0 时的错误描述信息 
+            virtual void OnStopMergeResult(
+                const std::string& job_id_,
+                const std::string& job_iid_,
+                int error_code_,
+                const std::string& error_str_
+            ) = 0;
+
+            // 切换远端 Tracks 大小流结果异步通知 
+            // @param error_code_ 0：切换成功；其它请参考错误码列表 
+            // @param error_str_ 当 error_code_ 非 0 时的错误描述信息 
+            // @param track_list_ 切换 profile 的 Tracks 列表 
+            virtual void OnSetSubscribeTracksProfileResult(
+                int error_code_,
+                const string& error_str_,
+                const TrackInfoList& track_list_
+            ) = 0;
+
+            // 创建单路转推任务结果反馈 
+            // @param job_id_ 单路转推的任务 id 
+            // @param error_code_ 0：成功， 非 0： 失败 
+            // @param error_str_ error_code_ 非 0 时的错误描述信息 
+            virtual void OnCreateForwardResult(
+                const std::string& job_id_,
+                int error_code_,
+                const std::string& error_str_
+            ) = 0;
+
+            // 停止单路转推任务结果反馈 
+            // @param job_id_ 单路转推的任务 id 
+            // @param job_iid_ iid 用于区分 id 相同时的情况，可以不用处理此字段 
+            // @param error_code_ 0：成功， 非 0： 失败 
+            // @param error_str_ error_code_ 非 0 时的错误描述信息 
+            virtual void OnStopForwardResult(
+                const std::string& job_id_,
+                const std::string& job_iid_,
+                int error_code_,
+                const std::string& error_str_
             ) = 0;
 
         protected:
@@ -238,6 +292,9 @@ namespace qiniu_v2 {
         virtual int MuteVideo(const string& track_id_, bool mute_flag_) = 0;
 
         // 创建自定义合流任务
+        // 当有合流及单路转推切换需求时，合流必须使用自定义合流，流地址一样时切换会有抢流现象，
+        // 因此需要拼接 "?serialnum=xxx" 决定流的优先级，serialnum 值越大，优先级越高。
+        // 切换成功后务必关闭之前的任务，否则会出现一路任务持续计费的情况
         // @param job_desc: 合流任务配置结构
         // @param merge_background: 合流背景图
         // @param merge_watermark: 合流水印图
@@ -269,12 +326,29 @@ namespace qiniu_v2 {
         // @return 用户 Id
         virtual const string& GetLocalUserId() = 0;
         
-        //发送自定义消息 
-        //@param users 目标用户列表，为空时则给房间中的所有人发消息（注意：不能填null） 
-        //@param messageId 消息ID，可以为空（注意：不能填null） 
-        //@param message 消息内容（注意：不能填null，不支持发送空消息，入参前需转成utf8格式） 
+        // 发送自定义消息 
+        // @param users 目标用户列表，为空时则给房间中的所有人发消息（注意：不能填 null） 
+        // @param messageId 消息 ID，可以为空（注意：不能填 null） 
+        // @param message 消息内容（注意：不能填 null，不支持发送空消息，入参前需转成 utf8 格式） 
         // @return 0:操作成功；其它请参考错误码列表。 
         virtual int SendCustomMessage(const list<string>& users_list_, const string& message_id, const string& message_) = 0;
+
+        // 切换订阅流的 profile 
+        // @param trackInfoList 需要切换 profile 的 tracks 链表 
+        virtual int UpdateSubscribeTracks(TrackInfoList& trackInfo_list_) = 0;
+
+        // 创建单路转推任务
+        // 当有合流及单路转推切换需求时，合流必须使用自定义合流，流地址一样时切换会有抢流现象，
+        // 因此需要拼接 "?serialnum=xxx" 决定流的优先级， serialnum 值越大，优先级越高。
+        // 切换成功后务必关闭之前的任务，否则会出现一路任务持续计费的情况
+        // @param job_des 单路转推任务配置结构 
+        // @return 0:操作成功，具体转推结果请通过观看旁路直播进行查看 
+        virtual int CreateForwardJob(const ForwardOptInfo& job_des) = 0;
+
+        // 停止单路转推任务
+        // @param job_id 单路转推任务 id 
+        // @return 0:操作成功，具体转推结果请通过观看旁路直播进行查看 
+        virtual int StopForwardJob(const string& job_id) = 0;
 
     protected:
         virtual ~QNRoomInterface() {}

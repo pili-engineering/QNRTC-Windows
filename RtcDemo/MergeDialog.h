@@ -19,7 +19,7 @@ public:
 
     struct MergeConfig
     {
-        std::string publish_url     = "rtmp://pili-publish.live.zhangrui.qiniuts.com/live-rui/flow-2";
+        std::string publish_url     = "rtmp://pili-publish.qnsdk.com/sdk-live/window-forward?serialnum=1";
 
         int32_t job_width           = 480;
         int32_t job_height          = 480;

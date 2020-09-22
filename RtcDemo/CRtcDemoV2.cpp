@@ -140,6 +140,9 @@ BEGIN_MESSAGE_MAP(CRtcDemoV2, CDialogEx)
     ON_BN_CLICKED(IDC_BUTTON_SEND_MSG, &CRtcDemoV2::OnBnClickedButtonSendMsg)
     ON_CBN_SELCHANGE(IDC_COMBO_LOCAL_ROTATION, &CRtcDemoV2::OnCbnSelchangeComboLocalRotate)
     ON_CBN_SELCHANGE(IDC_COMBO_REMOTE_ROTATION, &CRtcDemoV2::OnCbnSelchangeComboRemoteRotate)
+    ON_CBN_SELCHANGE(IDC_COMBO_SUBSCRIBE_PROFILE, &CRtcDemoV2::OnCbnSelchangeComboSubscribeProfile)
+    ON_BN_CLICKED(IDC_BUTTON_SIMULCAST, &CRtcDemoV2::OnBnClickedButtonSimulcast)
+    ON_BN_CLICKED(IDC_BUTTON_FORWARD, &CRtcDemoV2::OnBnClickedButtonForward)
 END_MESSAGE_MAP()
 
 
@@ -251,6 +254,7 @@ void CRtcDemoV2::InitUI()
     GetDlgItem(IDC_BUTTON_SEND_MSG)->EnableWindow(FALSE);
     GetDlgItem(IDC_COMBO_LOCAL_ROTATION)->EnableWindow(FALSE);
     GetDlgItem(IDC_COMBO_REMOTE_ROTATION)->EnableWindow(FALSE);
+    GetDlgItem(IDC_BUTTON_FORWARD)->EnableWindow(FALSE);
     ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_ROTATION))->InsertString(-1, utf2unicode("0").c_str());
     ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_ROTATION))->InsertString(-1, utf2unicode("90").c_str());
     ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_ROTATION))->InsertString(-1, utf2unicode("180").c_str());
@@ -262,6 +266,17 @@ void CRtcDemoV2::InitUI()
     ((CComboBox *)GetDlgItem(IDC_COMBO_REMOTE_ROTATION))->InsertString(-1, utf2unicode("180").c_str());
     ((CComboBox *)GetDlgItem(IDC_COMBO_REMOTE_ROTATION))->InsertString(-1, utf2unicode("270").c_str());
     ((CComboBox *)GetDlgItem(IDC_COMBO_REMOTE_ROTATION))->SetCurSel(0);
+
+    ((CComboBox *)GetDlgItem(IDC_COMBO_SUBSCRIBE_PROFILE))->InsertString(-1, utf2unicode("HIGH").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_SUBSCRIBE_PROFILE))->InsertString(-1, utf2unicode("MEDIUM").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_SUBSCRIBE_PROFILE))->InsertString(-1, utf2unicode("LOW").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_SUBSCRIBE_PROFILE))->SetCurSel(0);
+
+    if (_enable_simulcast) {
+        SetDlgItemText(IDC_BUTTON_SIMULCAST, _T("关闭多流"));
+    } else {
+        SetDlgItemText(IDC_BUTTON_SIMULCAST, _T("开启多流"));
+    }
 
     _wnd_status_bar.Create(WS_CHILD | WS_VISIBLE | SBT_OWNERDRAW, CRect(0, 0, 0, 0), this, 0);
     RECT rc;
@@ -354,7 +369,7 @@ std::tuple<int, int> CRtcDemoV2::FindBestVideoSize(const qiniu_v2::CameraCapabil
         return{ 0,0 };
     }
     // 高宽比例
-    float wh_ratio = 1.0f * 3 / 4;
+    float wh_ratio = 1.0f * 9 / 16;
     int dest_width(0), dest_height(0);
     for (auto itor : camera_cap_vec_) {
         if ((1.0f * itor.height / itor.width) == wh_ratio) {
@@ -409,7 +424,8 @@ void CRtcDemoV2::OnJoinResult(
     if (0 == error_code_) {
         _wnd_status_bar.SetText(_T("登录成功！"), 1, 0);
         SetDlgItemText(IDC_BUTTON_LOGIN, _T("离开"));
-
+        GetDlgItem(IDC_BUTTON_SIMULCAST)->EnableWindow(FALSE);
+        GetDlgItem(IDC_BUTTON_FORWARD)->EnableWindow(TRUE);
         lock_guard<recursive_mutex> lck(_mutex);
         _user_list.clear();
         _user_list_ctrl.DeleteAllItems();
@@ -435,6 +451,15 @@ void CRtcDemoV2::OnJoinResult(
             shared_ptr<TrackInfoUI> tiu(new TrackInfoUI(this, tmp_track_ptr));
             if (tiu->render_wnd_ptr) {
                 tmp_track_ptr->SetRenderHwnd((void*)tiu->render_wnd_ptr->m_hWnd);
+            }
+            // 默认订阅的 profile 为 HIGH 
+            if (tmp_track_ptr->GetKind().compare("video") == 0) {
+                for (auto&& layeritor : tmp_track_ptr->GetLayerInfo())
+                {
+                    if (layeritor.mProfile == qiniu_v2::HIGH) {
+                        layeritor.mChooseToSub = true;
+                    }
+                }
             }
             _remote_tracks_map.insert_or_assign(tmp_track_ptr->GetTrackId(), tiu);
             sub_tracks_list.emplace_back(tmp_track_ptr);
@@ -490,7 +515,7 @@ void CRtcDemoV2::OnJoinResult(
             break;
         case Err_ReconnToken_Error:
             _snwprintf(buff, 1024, _T("登录失败，error code:%d, error msg:%s"),
-                error_code_, utf2unicode("重新进入房间超时，注意网络质量").c_str());
+                error_code_, utf2unicode("重新进入房间超时，请重新获取roomtoken后进入房间").c_str());
             break;
         case Err_Room_Not_Exist:
             _snwprintf(buff, 1024, _T("登录失败，error code:%d, error msg:%s"),
@@ -503,6 +528,7 @@ void CRtcDemoV2::OnJoinResult(
         default:
             break;
         }
+        GetDlgItem(IDC_BUTTON_FORWARD)->EnableWindow(FALSE);
         _wnd_status_bar.SetText(buff, 1, 0);
         SetDlgItemText(IDC_BUTTON_LOGIN, _T("登录"));
         // ReJoin，demo 这边针对异常做了重新连接功能，
@@ -647,15 +673,198 @@ void CRtcDemoV2::OnRemoteStatisticsUpdated(const qiniu_v2::StatisticsReportList&
     }
 }
 
+
+void CRtcDemoV2::OnCreateMergeResult(
+    const std::string& job_id_,
+    int error_code_,
+    const std::string& error_str_)
+{
+    wchar_t buff[1024] = { 0 };
+    if (error_code_ != 0) {
+        switch (error_code_) {
+        case Err_No_Permission:
+            _snwprintf(buff, 1024, _T("合流失败，error code:%d, error msg:%s"),
+                error_code_, utf2unicode("请检查用户是否有合流权限").c_str());
+            break;
+        case Err_Invalid_Parameter:
+            _snwprintf(buff, 1024, _T("合流失败，error code:%d, error msg:%s"),
+                error_code_, utf2unicode("服务交互参数错误").c_str());
+            break;
+        default:
+            break;
+        }
+        _wnd_status_bar.SetText(buff, 1, 0);
+    }
+    else {
+        _snwprintf(buff, 1024, _T("合流成功"));
+        if (_contain_forward_flag) {
+            // 如果是单路转推切合流任务，在合流成功之后停止单路转推 
+            _rtc_room_interface->StopForwardJob(_custom_forward_id);
+        }
+    }
+}
+
+void CRtcDemoV2::OnStopMergeResult(
+    const std::string& job_id_,
+    const std::string& job_iid_,
+    int error_code_,
+    const std::string& error_str_)
+{
+    wchar_t buff[1024] = { 0 };
+    if (error_code_ != 0) {
+        switch (error_code_) {
+        case Err_No_Permission:
+            _snwprintf(buff, 1024, _T("合流停止失败，error code:%d, error msg:%s"),
+                error_code_, utf2unicode("请检查用户是否有合流权限").c_str());
+            break;
+        case Err_Invalid_Parameter:
+            _snwprintf(buff, 1024, _T("合流停止失败，error code:%d, error msg:%s"),
+                error_code_, utf2unicode("服务交互参数错误").c_str());
+            break;
+        default:
+            break;
+        }
+        _wnd_status_bar.SetText(buff, 1, 0);
+    }
+    else {
+        _snwprintf(buff, 1024, _T("合流停止成功"));
+    }
+}
+
+void CRtcDemoV2::OnSetSubscribeTracksProfileResult(
+    int error_code_,
+    const string& error_str_,
+    const qiniu_v2::TrackInfoList& track_list_
+)
+{
+    // 切换 profile 后，将对应的生效状态 mActive 置为 true。
+    for (auto&& itor : track_list_)
+    {
+        auto tmp_itor = _remote_tracks_map.find(itor->GetTrackId());
+        if (tmp_itor == _remote_tracks_map.end()) {
+            continue;
+        }
+
+        if (tmp_itor->second->track_info_ptr->GetKind().compare(VIDEO_KIND_TYPE) == 0) {
+            for (auto&& layer_itor : itor->GetLayerInfo())
+            {
+                if (layer_itor.mActive) {
+                    for (auto&& cur_itor : tmp_itor->second->track_info_ptr->GetLayerInfo()) {
+                        if (layer_itor.mProfile == cur_itor.mProfile) {
+                            cur_itor.mActive = true;
+                            if (cur_itor.mProfile == qiniu_v2::HIGH) {
+                                ((CComboBox*)GetDlgItem(IDC_COMBO_SUBSCRIBE_PROFILE))->SetCurSel(0);
+                            } else if (cur_itor.mProfile == qiniu_v2::MEDIUM) {
+                                ((CComboBox*)GetDlgItem(IDC_COMBO_SUBSCRIBE_PROFILE))->SetCurSel(1);
+                            } else if (cur_itor.mProfile == qiniu_v2::LOW) {
+                                ((CComboBox*)GetDlgItem(IDC_COMBO_SUBSCRIBE_PROFILE))->SetCurSel(2);
+                            }
+                        } else {
+                            cur_itor.mActive = false;
+                        }
+                        cur_itor.mChooseToSub = false;
+                    }
+                }
+
+            }
+        }
+    }
+
+    for (auto&& itor : track_list_) {
+        itor->Release();
+    }
+}
+
+void CRtcDemoV2::OnCreateForwardResult(
+    const std::string& job_id_,
+    int error_code_,
+    const std::string& error_str_)
+{
+    wchar_t buff[1024] = { 0 };
+    if (error_code_ != 0) {
+        switch (error_code_) {
+        case Err_No_Permission:
+            _snwprintf(buff, 1024, _T("单路转推失败，error code:%d, error msg:%s"),
+                error_code_, utf2unicode("请检查用户是否有转推权限").c_str());
+            break;
+        case Err_Invalid_Parameter:
+            _snwprintf(buff, 1024, _T("单路转推失败，error code:%d, error msg:%s"),
+                error_code_, utf2unicode("服务交互参数错误").c_str());
+            break;
+        default:
+            break;
+        }
+        _wnd_status_bar.SetText(buff, 1, 0);
+    } else {
+        _snwprintf(buff, 1024, _T("单路转推成功"));
+        // 如果是合流切单路转推任务，在单路转推成功之后停止单路转推 
+        if (_contain_admin_flag) {
+            _rtc_room_interface->StopMergeStream();
+        }
+        if (1 == ((CButton*)GetDlgItem(IDC_CHECK_MERGE))->GetCheck()) {
+            _rtc_room_interface->StopMergeStream(_custom_merge_id);
+        }
+    }
+}
+
+void CRtcDemoV2::OnStopForwardResult(
+    const std::string& job_id_,
+    const std::string& job_iid_,
+    int error_code_,
+    const std::string& error_str_)
+{
+    wchar_t buff[1024] = { 0 };
+    if (error_code_ != 0) {
+        switch (error_code_) {
+        case Err_No_Permission:
+            _snwprintf(buff, 1024, _T("单路转推停止失败，error code:%d, error msg:%s"),
+                error_code_, utf2unicode("请检查用户是否有转推权限").c_str());
+            break;
+        case Err_Invalid_Parameter:
+            _snwprintf(buff, 1024, _T("单路转推停止失败，error code:%d, error msg:%s"),
+                error_code_, utf2unicode("服务交互参数错误").c_str());
+            break;
+        default:
+            break;
+        }
+        _wnd_status_bar.SetText(buff, 1, 0);
+    } else {
+        _snwprintf(buff, 1024, _T("单路转推停止成功"));
+    }
+}
+
 void CRtcDemoV2::OnSubscribeTracksResult(int error_code_, 
     const std::string &error_str_, const qiniu_v2::TrackInfoList &track_info_list_)
 {
     wchar_t buff[1024] = { 0 };
     int succ_num(0), failed_num(0);
     // 依次判断订阅结果
+    // 将订阅的 profile 所对应的生效状态 mActive 置为 true。
     for (auto&& itor : track_info_list_)
     {
         if (itor->IsConnected()) {
+            auto tmp_itor = _remote_tracks_map.find(itor->GetTrackId());
+            if (tmp_itor == _remote_tracks_map.end()) {
+                continue;
+            }
+
+            if (tmp_itor->second->track_info_ptr->GetKind().compare(VIDEO_KIND_TYPE) == 0) {
+                for (auto&& layer_itor : itor->GetLayerInfo())
+                {
+                    if (layer_itor.mActive) {
+                        for (auto&& cur_itor : tmp_itor->second->track_info_ptr->GetLayerInfo()) {
+                            if (layer_itor.mProfile == cur_itor.mProfile) {
+                                cur_itor.mActive = true;  //当前订阅的远端 track 的 profile 对应生效状态置为 true 
+                            } else {
+                                cur_itor.mActive = false;
+                            }
+                            cur_itor.mChooseToSub = false;
+                        }
+                    }
+
+                }
+            }
+
             ++succ_num;
             TRACE(
                 _T("订阅成功， User Id:%s, track Id：%s, Kind:%s, tag:%s\n"),
@@ -723,6 +932,15 @@ void CRtcDemoV2::OnRemoteAddTracks(const qiniu_v2::TrackInfoList& track_list_)
         shared_ptr<TrackInfoUI> tiu(new TrackInfoUI(this, tmp_track_ptr));
         if (tiu->render_wnd_ptr) {
             tmp_track_ptr->SetRenderHwnd((void*)tiu->render_wnd_ptr->m_hWnd);
+        }
+        // 默认订阅的 profile 为 HIGH 
+        if (tmp_track_ptr->GetKind().compare("video") == 0) {
+            for (auto&& layeritor : tmp_track_ptr->GetLayerInfo())
+            {
+                if (layeritor.mProfile == qiniu_v2::HIGH) {
+                    layeritor.mChooseToSub = true;
+                }
+            }
         }
         _remote_tracks_map.insert_or_assign(tmp_track_ptr->GetTrackId(), tiu);
 
@@ -1105,7 +1323,8 @@ void CRtcDemoV2::OnBnClickedButtonLogin()
         GetDlgItem(IDC_COMBO_REMOTE_ROTATION)->EnableWindow(FALSE);
         ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_ROTATION))->SetCurSel(0);
         ((CComboBox *)GetDlgItem(IDC_COMBO_REMOTE_ROTATION))->SetCurSel(0);
-
+        GetDlgItem(IDC_BUTTON_SIMULCAST)->EnableWindow(TRUE);
+        GetDlgItem(IDC_BUTTON_FORWARD)->EnableWindow(FALSE);
         _remote_tracks_map.clear();
 
         KillTimer(UPDATE_TIME_DURATION_TIMER);
@@ -1143,7 +1362,7 @@ void CRtcDemoV2::OnBnClickedButtonPreviewVideo()
         _rtc_video_interface->UnPreviewCamera(cur_dev_id);
         GetDlgItem(IDC_COMBO_CAMERA)->EnableWindow(TRUE);
         SetDlgItemText(IDC_BUTTON_PREVIEW_VIDEO, _T("预览"));
-        GetDlgItem(IDC_STATIC_VIDEO_PREVIEW2)->Invalidate();
+        GetDlgItem(IDC_STATIC_VIDEO_PREVIEW3)->Invalidate();
         return;
     }
 
@@ -1153,7 +1372,7 @@ void CRtcDemoV2::OnBnClickedButtonPreviewVideo()
     camera_setting.width       = 640;
     camera_setting.height      = 480;
     camera_setting.max_fps     = 15;
-    camera_setting.render_hwnd = GetDlgItem(IDC_STATIC_VIDEO_PREVIEW2)->m_hWnd;
+    camera_setting.render_hwnd = GetDlgItem(IDC_STATIC_VIDEO_PREVIEW3)->m_hWnd;
 
     if (0 != _rtc_video_interface->PreviewCamera(camera_setting)) {
         MessageBox(_T("预览失败！"));
@@ -1230,7 +1449,6 @@ void CRtcDemoV2::StartPublish()
         return;
     }
     qiniu_v2::TrackInfoList track_list;
-
 CHECK_CAMERA:
     if (1 == ((CButton*)GetDlgItem(IDC_CHECK_CAMERA))->GetCheck()) {
         CString video_dev_name;
@@ -1254,16 +1472,20 @@ CHECK_CAMERA:
         }
         // 用户需根据摄像头采集能力集，设置适合自己的图像分辨率、帧率和码率。
         auto camera_size = FindBestVideoSize(_camera_dev_map[video_dev_id].capability_vec);
+        int width = std::get<0>(camera_size);
+        int height = std::get<1>(camera_size);
         auto video_track_ptr = qiniu_v2::QNTrackInfo::CreateVideoTrackInfo(
             video_dev_id,
             CAMERA_TAG,
             GetDlgItem(IDC_STATIC_VIDEO_PREVIEW)->m_hWnd,
-            std::get<0>(camera_size),
-            std::get<1>(camera_size),
-            15,
-            500000,
+            width,
+            height,
+            30,
+            2000000,
             qiniu_v2::tst_Camera,
-            false
+            false,
+            _enable_simulcast     // 是否支持多流发送，只有分辨率大于等于 1280*720 的视频 track 支持多流发送,否则设置为false 
+                                  // 请根据自己需要是否开启多流功能，开启此功能需注意发送端带宽是否支持 
         );
         track_list.emplace_back(video_track_ptr);
     }
@@ -1291,6 +1513,7 @@ CHECK_SCREEN:
             30,
             500000,
             qiniu_v2::tst_ScreenCasts,
+            false,
             false
         );
         track_list.emplace_back(video_track_ptr);
@@ -1316,6 +1539,7 @@ CHECK_EXTERNAL:
             30,
             300000,
             qiniu_v2::tst_ExternalYUV,
+            false,
             false
         );
         track_list.emplace_back(video_track_ptr);
@@ -1381,6 +1605,7 @@ void CRtcDemoV2::OnBnClickedCheckCamera()
             }
             ++itor;
         }
+
         auto camera_size = FindBestVideoSize(_camera_dev_map[video_dev_id].capability_vec);
         auto video_track_ptr = qiniu_v2::QNTrackInfo::CreateVideoTrackInfo(
             video_dev_id,
@@ -1391,6 +1616,7 @@ void CRtcDemoV2::OnBnClickedCheckCamera()
             15,
             500000,
             qiniu_v2::tst_Camera,
+            false,
             false
         );
         qiniu_v2::TrackInfoList track_list;
@@ -1454,6 +1680,7 @@ void CRtcDemoV2::OnBnClickedCheckScreen()
             ((CButton*)GetDlgItem(IDC_CHECK_SCREEN))->SetCheck(0);
             return;
         }
+
         auto video_track_ptr2 = qiniu_v2::QNTrackInfo::CreateVideoTrackInfo(
             std::to_string(source_id),
             SCREENCASTS_TAG,
@@ -1463,6 +1690,7 @@ void CRtcDemoV2::OnBnClickedCheckScreen()
             30,
             300000,
             qiniu_v2::tst_ScreenCasts,
+            false,
             false
         );
         qiniu_v2::TrackInfoList track_list;
@@ -1574,7 +1802,6 @@ void CRtcDemoV2::OnBnClickedCheckImportRawData()
             return;
         }
         _rtc_audio_interface->EnableAudioFakeInput(true);
-
         auto video_track_ptr = qiniu_v2::QNTrackInfo::CreateVideoTrackInfo(
             "",
             EXTERNAL_TAG,
@@ -1584,6 +1811,7 @@ void CRtcDemoV2::OnBnClickedCheckImportRawData()
             30,
             300000,
             qiniu_v2::tst_ExternalYUV,
+            false,
             false
         );
         qiniu_v2::TrackInfoList track_list;
@@ -2149,6 +2377,99 @@ void CRtcDemoV2::OnCbnSelchangeComboRemoteRotate()
             if (_rtc_video_interface) {
                 _rtc_video_interface->SetVideoRotation(itor.first, video_rotation);
             }
+        }
+    }
+}
+
+void CRtcDemoV2::OnCbnSelchangeComboSubscribeProfile()
+{
+    // TODO: 在此添加控件通知处理程序代码
+    int profile_sel = ((CComboBox*)GetDlgItem(IDC_COMBO_SUBSCRIBE_PROFILE))->GetCurSel();
+    qiniu_v2::QNTrackProfile video_profile = qiniu_v2::QNTrackProfile::HIGH;
+    switch (profile_sel)
+    {
+    case 0:
+        video_profile = qiniu_v2::QNTrackProfile::HIGH;
+        break;
+    case 1:
+        video_profile = qiniu_v2::QNTrackProfile::MEDIUM;
+        break;
+    case 2:
+        video_profile = qiniu_v2::QNTrackProfile::LOW;
+        break;
+    default:
+        break;
+    }
+
+    // 这里只是演示时是将所有订阅流一起切成设置的 profile，用户实际根据自己需求，更改相应track的profile，
+    // 想要切换成哪种 profile，只要将对应的 mChooseToSub 设置为 true。
+    lock_guard<recursive_mutex> lck(_mutex);
+    qiniu_v2::TrackInfoList sub_tracks_list;
+
+    for (auto&& itor : _remote_tracks_map) {
+        if (itor.second->track_info_ptr->GetKind().compare("video") == 0) {
+            auto tmp_track_ptr = qiniu_v2::QNTrackInfo::Copy(itor.second->track_info_ptr);
+            for (auto&& layer_itor : tmp_track_ptr->GetLayerInfo()) {
+                if (layer_itor.mProfile == video_profile) {
+                    layer_itor.mChooseToSub = true;
+                }
+            }
+            sub_tracks_list.emplace_back(tmp_track_ptr);
+        }
+    }
+    _rtc_room_interface->UpdateSubscribeTracks(sub_tracks_list);
+}
+
+void CRtcDemoV2::OnBnClickedButtonSimulcast()
+{
+    // TODO: 在此添加控件通知处理程序代码
+    CString btn_str;
+    GetDlgItemText(IDC_BUTTON_SIMULCAST, btn_str);
+    if (btn_str.CompareNoCase(_T("开启多流")) == 0) {
+        SetDlgItemText(IDC_BUTTON_SIMULCAST, _T("关闭多流"));
+        _enable_simulcast = true;
+    }
+    else {
+        SetDlgItemText(IDC_BUTTON_SIMULCAST, _T("开启多流"));
+        _enable_simulcast = false;
+    }
+}
+
+
+void CRtcDemoV2::OnBnClickedButtonForward()
+{
+    // TODO: 在此添加控件通知处理程序代码
+    CString btn_str;
+    GetDlgItemText(IDC_BUTTON_FORWARD, btn_str);
+    // 登录房间
+    if (btn_str.CompareNoCase(_T("单流转推")) == 0) {
+        SetDlgItemText(IDC_BUTTON_FORWARD, _T("停止单流转推"));
+        _custom_forward_id = "window-forward";
+        qiniu_v2::ForwardOptInfo forwardInfo;
+        forwardInfo.audio_only = false;
+        forwardInfo.job_id = _custom_forward_id;
+        forwardInfo.publish_url = "rtmp://pili-publish.qnsdk.com/sdk-live/window-forward";
+        _forward_audio_flag = false;
+        _forward_video_flag = false;
+        for (auto&& itor : _local_tracks_list) {
+            if (itor->GetKind().compare("audio") == 0 && !_forward_audio_flag) {
+                _forward_audio_flag = true;
+                forwardInfo.track_id_list.emplace_back(itor->GetTrackId());
+            }
+            if (itor->GetKind().compare("video") == 0 && !_forward_video_flag) {
+                _forward_video_flag = true;
+                forwardInfo.track_id_list.emplace_back(itor->GetTrackId());
+            }
+        }
+        if (_rtc_room_interface) {
+            _rtc_room_interface->CreateForwardJob(forwardInfo);
+            _contain_forward_flag = true;
+        }
+    } else {
+        SetDlgItemText(IDC_BUTTON_FORWARD, _T("单流转推"));
+        if (_rtc_room_interface) {
+            _rtc_room_interface->StopForwardJob(_custom_forward_id);
+            _contain_forward_flag = false;
         }
     }
 }
