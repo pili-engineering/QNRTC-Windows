@@ -145,6 +145,9 @@ BEGIN_MESSAGE_MAP(CRtcDemoV2, CDialogEx)
     ON_BN_CLICKED(IDC_BUTTON_SIMULCAST, &CRtcDemoV2::OnBnClickedButtonSimulcast)
     ON_BN_CLICKED(IDC_BUTTON_FORWARD, &CRtcDemoV2::OnBnClickedButtonForward)
     ON_BN_CLICKED(IDC_BUTTON_EXTRA_DATA, &CRtcDemoV2::OnBnClickedButtonExtraData)
+    ON_BN_CLICKED(IDC_CHECK_CAMERA_IMAGE, &CRtcDemoV2::OnBnClickedCheckCameraImage)
+    ON_BN_CLICKED(IDC_CHECK_CAMERA_MIRROR, &CRtcDemoV2::OnBnClickedCheckCameraMirror)
+    ON_BN_CLICKED(IDC_BTN_SEI, &CRtcDemoV2::OnBnClickedBtnSei)
 END_MESSAGE_MAP()
 
 
@@ -188,8 +191,7 @@ void CRtcDemoV2::OnTimer(UINT_PTR nIDEvent)
         if (_rtc_room_interface) {
             _rtc_room_interface->Loop();
         }
-    } else if (UPDATE_TIME_DURATION_TIMER == nIDEvent)
-    {
+    } else if (UPDATE_TIME_DURATION_TIMER == nIDEvent) {
         // 更新连麦时间
         chrono::seconds df_time
             = chrono::duration_cast<chrono::seconds>(chrono::steady_clock::now() - _start_tp);
@@ -274,6 +276,10 @@ void CRtcDemoV2::InitUI()
     ((CComboBox *)GetDlgItem(IDC_COMBO_SUBSCRIBE_PROFILE))->InsertString(-1, utf2unicode("MEDIUM").c_str());
     ((CComboBox *)GetDlgItem(IDC_COMBO_SUBSCRIBE_PROFILE))->InsertString(-1, utf2unicode("LOW").c_str());
     ((CComboBox *)GetDlgItem(IDC_COMBO_SUBSCRIBE_PROFILE))->SetCurSel(0);
+
+    ((CComboBox *)GetDlgItem(IDC_COMBO_CLIP_CROP))->InsertString(-1, utf2unicode("camera").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_CLIP_CROP))->InsertString(-1, utf2unicode("video external").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_CLIP_CROP))->SetCurSel(0);
 
     if (_enable_simulcast) {
         SetDlgItemText(IDC_BUTTON_SIMULCAST, _T("关闭多流"));
@@ -879,6 +885,7 @@ void CRtcDemoV2::OnSubscribeTracksResult(int error_code_,
     for (auto&& itor : track_info_list_)
     {
         if (itor->IsConnected()) {
+            _rtc_video_interface->SetStretchMode(itor->GetTrackId(), qiniu_v2::ASPECT_FILL);
             auto tmp_itor = _remote_tracks_map.find(itor->GetTrackId());
             if (tmp_itor == _remote_tracks_map.end()) {
                 continue;
@@ -1337,24 +1344,29 @@ void CRtcDemoV2::OnBnClickedButtonLogin()
 {
     // TODO: Add your control notification handler code here
     // 设置画面裁剪和缩放参数，在 JoinRoom 之前设置。
+    int clip_crop_source = ((CComboBox*)GetDlgItem(IDC_COMBO_CLIP_CROP))->GetCurSel();
+    if (clip_crop_source == 0) {
+        _src_capturer_source = qiniu_v2::tst_Camera;
+    } else {
+        _src_capturer_source = qiniu_v2::tst_ExternalYUV;
+    }
+
     if (1 == ((CButton*)GetDlgItem(IDC_CHECK_CLIP))->GetCheck()) {
         int cropX = GetDlgItemInt(IDC_EDIT_CLIP_X, NULL, 0);
         int cropY = GetDlgItemInt(IDC_EDIT_CLIP_Y, NULL, 0);
         int width = GetDlgItemInt(IDC_EDIT_CLIP_WIDTH, NULL, 0);
         int height = GetDlgItemInt(IDC_EDIT_CLIP_HEIGHT, NULL, 0);
-        _rtc_video_interface->SetCropAndScale(qiniu_v2::tst_Camera, qiniu_v2::p_Crop, true, cropX, cropY, width, height);
-    }
-    else {
-        _rtc_video_interface->SetCropAndScale(qiniu_v2::tst_Camera, qiniu_v2::p_Crop, false, 0, 0, 0, 0);
+        _rtc_video_interface->SetCropAndScale(_src_capturer_source, qiniu_v2::p_Crop, true, cropX, cropY, width, height);
+    } else {
+        _rtc_video_interface->SetCropAndScale(_src_capturer_source, qiniu_v2::p_Crop, false, 0, 0, 0, 0);
     }
 
     if (1 == ((CButton*)GetDlgItem(IDC_CHECK_SCALE))->GetCheck()) {
         int width = GetDlgItemInt(IDC_EDIT_SCALE_WIDTH, NULL, 0);
         int height = GetDlgItemInt(IDC_EDIT_SCALE_HEIGHT, NULL, 0);
-        _rtc_video_interface->SetCropAndScale(qiniu_v2::tst_Camera, qiniu_v2::p_Scale, true, 0, 0, width, height);
-    }
-    else {
-        _rtc_video_interface->SetCropAndScale(qiniu_v2::tst_Camera, qiniu_v2::p_Scale, false, 0, 0, 0, 0);
+        _rtc_video_interface->SetCropAndScale(_src_capturer_source, qiniu_v2::p_Scale, true, 0, 0, width, height);
+    } else {
+        _rtc_video_interface->SetCropAndScale(_src_capturer_source, qiniu_v2::p_Scale, false, 0, 0, 0, 0);
     }
 
     CString btn_str;
@@ -2188,13 +2200,18 @@ void CRtcDemoV2::AdjustMergeStreamLayouts()
                 add_tracks_list.emplace_back(merge_opt);
                 continue;
             }
-
+            
             if (_merge_config.merge_local_video) {
+                // 这里只做演示，用户可根据自己需求设置相应 video track 合流时的填充模式
+                if (1 == ((CButton*)GetDlgItem(IDC_CHECK_STRETCH_MODE))->GetCheck()) {
+                    merge_opt.stretchMode = qiniu_v2::SCALE_TO_FIT;
+                }
                 merge_opt.pos_x = _merge_config.local_video_x;
                 merge_opt.pos_y = _merge_config.local_video_y;
                 merge_opt.pos_z = 1;
                 merge_opt.width = _merge_config.local_video_width;
                 merge_opt.height = _merge_config.local_video_height;
+                merge_opt.is_support_sei = true;
                 add_tracks_list.emplace_back(merge_opt);
             }
         }
@@ -2210,11 +2227,16 @@ void CRtcDemoV2::AdjustMergeStreamLayouts()
             }
 
             if (_merge_config.merge_remote_video) {
+                // 这里只做演示，用户可根据自己需求设置相应 video track 合流时的填充模式
+                if (1 == ((CButton*)GetDlgItem(IDC_CHECK_STRETCH_MODE))->GetCheck()) {
+                    merge_opt.stretchMode = qiniu_v2::SCALE_TO_FIT;
+                }
                 merge_opt.pos_x = _merge_config.remote_video_x;
                 merge_opt.pos_y = _merge_config.remote_video_y;
                 merge_opt.pos_z = 1;
                 merge_opt.width = _merge_config.remote_video_width;
                 merge_opt.height = _merge_config.remote_video_height;
+                merge_opt.is_support_sei = false;
                 add_tracks_list.emplace_back(merge_opt);
             }
         }
@@ -2615,5 +2637,46 @@ void CRtcDemoV2::OnBnClickedButtonExtraData()
         _rtc_audio_interface->EnableRemoteAudioPacketCallBack(true);
         SetDlgItemText(IDC_BUTTON_EXTRA_DATA, _T("关闭数据加解密"));
         _enable_encryptor_decryptor = true;
+    }
+}
+
+
+void CRtcDemoV2::OnBnClickedCheckCameraImage()
+{
+    if (1 == ((CButton*)GetDlgItem(IDC_CHECK_CAMERA_IMAGE))->GetCheck()) {
+        _rtc_video_interface->PushCameraTrackWithImage("pause_publish.jpeg");
+    } else {
+        _rtc_video_interface->PushCameraTrackWithImage("");
+    }
+}
+
+void CRtcDemoV2::OnBnClickedCheckCameraMirror()
+{
+    if (1 == ((CButton*)GetDlgItem(IDC_CHECK_CAMERA_MIRROR))->GetCheck()) {
+        _rtc_video_interface->CameraCaptureMirror(true);
+    } else {
+        _rtc_video_interface->CameraCaptureMirror(false);
+    }
+}
+
+void CRtcDemoV2::OnBnClickedBtnSei()
+{
+    CString btn_str;
+    GetDlgItemText(IDC_BTN_SEI, btn_str);
+    list<string> tracks_id_list;
+    for (auto&& itor : _local_tracks_list) {
+        if (itor->GetKind().compare("video") == 0) {
+            tracks_id_list.emplace_back(itor->GetTrackId());
+        }
+    }
+
+    if (tracks_id_list.size() != 0) {
+        if (btn_str.CompareNoCase(_T("开启SEI")) == 0) {
+            SetDlgItemText(IDC_BTN_SEI, _T("关闭SEI"));
+            _rtc_video_interface->SetLocalVideoSei(tracks_id_list, string_to_utf8("七牛SEI" + std::to_string(rand())), -1);
+        } else {
+            SetDlgItemText(IDC_BTN_SEI, _T("开启SEI"));
+            _rtc_video_interface->SetLocalVideoSei(tracks_id_list, "", 0);
+        }
     }
 }
