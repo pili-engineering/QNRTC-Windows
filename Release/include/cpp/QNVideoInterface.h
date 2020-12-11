@@ -376,7 +376,7 @@ namespace qiniu_v2
         virtual int InputH264Frame(H264Nal** nals_ptr_, unsigned int nals_size_, uint8_t is_key_frame_) = 0;
 
         // 原始帧处理功能接口：裁剪和缩放，设置参数要求如下，如果设置不正确，则输出原始图像，OnVideoFrame 回调接口中会有输出宽高体现 
-        // @param src_capturer_source 数据源类型，目前只支持摄像头采集数据 
+        // @param src_capturer_source 数据源类型，目前只支持摄像头采集和用户外部导入的 kRGB24、kYUY2、kI420 数据 
         // @param mode 裁剪/缩放 
         // @param enable 开/关 
         // @param cropX 开始裁减的 X 坐标点，原点为左上角，必须落在原图之内 
@@ -395,6 +395,29 @@ namespace qiniu_v2
         // 配置渲染时画面旋转角度 
         virtual int SetVideoRotation(const std::string& track_id_, VideoRotation rotation) = 0;
 
+        // 使用摄像头 track 推送图片流：暂时只支持jpeg图片推送，此接口需要在摄像头推流成功后调用。
+        // @param image_path_ 被推送图片路径，设置为 "" 时，关闭图片推送，恢复摄像头采集画面 
+        // @return 成功返回 0，失败返回值小于 0 
+        virtual int PushCameraTrackWithImage(const std::string& image_path_) = 0;
+
+        // 配置本地渲染窗口画面填充模式 
+        // @param stretch_mode_ 画面在窗口中的填充模式，默认是 ASPECT_FIT 
+        virtual int SetStretchMode(const std::string& track_id_, MergeStretchMode stretch_mode_) = 0;
+
+        // 配置摄像头采集是否开启镜像功能 
+        // @param mirror_flag_ 设置为 true 是开启摄像头画面镜像功能，反之则关闭 
+        // @return 成功返回 0，失败返回值小于 0 
+        virtual int CameraCaptureMirror(bool mirror_flag_) = 0;
+
+        // 支持自定义 video sei 数据插入，在使用合流功能时插入SEI，必须要保证 
+        // 合流时设置的帧率不超过连麦时的帧率。 
+        // @param tracks_id_list_ 支持设置 sei 的 track id 链表 
+        // @param video_sei_content_ 被插入的 sei 数据 
+        // @param video_sei_repeat_times_  当前 sei 数据被插入的次数，-1 表示持续插入。 
+        virtual void SetLocalVideoSei(
+            const list<string>& tracks_id_list_,
+            const std::string& video_sei_content_,
+            const int video_sei_repeat_times_) = 0;
     protected:
         virtual ~QNVideoInterface() {}
     };

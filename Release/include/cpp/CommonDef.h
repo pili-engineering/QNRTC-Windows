@@ -67,6 +67,7 @@ namespace qiniu_v2 {
     // 合流画面填充方式 
     enum MergeStretchMode
     {
+        ASPECT_INVALID = -1, // 无效值
         ASPECT_FILL  = 0,   // 在保持长宽比的前提下，缩放视频，使其充满容器 
         ASPECT_FIT   = 1,   // 在保持长宽比的前提下，缩放视频，使其在容器内完整显示，边缘部分填充黑边 
         SCALE_TO_FIT = 2,   // 缩放视频，使其填充满容器，可能导致拉伸变形 
@@ -115,6 +116,9 @@ namespace qiniu_v2 {
         int    pos_z;        // 此路流（即此 Track）在 RTMP 流画布中的 Z 坐标 
         int    width;        // 此路流（即此 Track）在 RTMP 流画布中的宽度，缩放、裁减方式根据后端配置决定 
         int    height;       // 此路流（即此 Track）在 RTMP 流画布中的高度，缩放、裁减方式根据后端配置决定 
+        MergeStretchMode stretchMode = ASPECT_INVALID;   // 设置视频 Track 在合流时的填充模式，如果不做单独设置，
+                                                         // 填充模式将继承 CreateMergeJob 的 stretchMode 
+        bool is_support_sei = false;   // 是否支持私有 SEI 数据插入，只能设置一个 track 为 true 
     };
 
     // 用户信息 

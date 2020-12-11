@@ -77,7 +77,7 @@ namespace qiniu_v2 {
             // @param bits_per_sample_ 位宽，即每个采样点占用位数
             // @param sample_rate_ 采样率
             // @param number_of_channels_ 声道数
-            // @param number_of_frames_ 此次回调内包含了多了多少采样点数
+            // @param number_of_frames_ 此次回调内包含了多少采样点数
             // @param user_id_ PCM 数据所属 User Id，可以是远端用户也可以是本地用户 
             virtual void OnAudioPCMFrame(
                 const unsigned char* audio_data_,
