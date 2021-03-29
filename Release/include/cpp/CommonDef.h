@@ -102,6 +102,7 @@ namespace qiniu_v2 {
         int bitrate = 0;            // 合流码率bps 
         int min_bitrate = 0;        // 最小码率 
         int max_bitrate = 0;        // 最大码率 
+        bool is_hold_last_frame = false; //合流停止时是否保持最后一帧画面 
         MergeStretchMode stretch_mode = ASPECT_FILL;
     };
 

@@ -55,6 +55,7 @@ public:
         int32_t remote_video_width  = 200;
         int32_t remote_video_height = 200;
 
+        bool hold_last_frame = false;
     } _merge_config;
 
     #define MERGE_MESSAGE_ID    100

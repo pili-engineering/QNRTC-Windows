@@ -709,7 +709,7 @@ void CRtcDemoV2::OnCreateMergeResult(
         _snwprintf(buff, 1024, _T("合流成功"));
         if (_contain_forward_flag) {
             // 如果是单路转推切合流任务，在合流成功之后停止单路转推 
-            _rtc_room_interface->StopForwardJob(_custom_forward_id);
+            _rtc_room_interface->StopForwardJob(_custom_forward_id, 0);
         }
     }
 }
@@ -809,10 +809,10 @@ void CRtcDemoV2::OnCreateForwardResult(
         _snwprintf(buff, 1024, _T("单路转推成功"));
         // 如果是合流切单路转推任务，在单路转推成功之后停止单路转推 
         if (_contain_admin_flag) {
-            _rtc_room_interface->StopMergeStream();
+            _rtc_room_interface->StopMergeStream(string(), 0);
         }
         if (1 == ((CButton*)GetDlgItem(IDC_CHECK_MERGE))->GetCheck()) {
-            _rtc_room_interface->StopMergeStream(_custom_merge_id);
+            _rtc_room_interface->StopMergeStream(_custom_merge_id, 0);
         }
     }
 }
@@ -1434,10 +1434,10 @@ void CRtcDemoV2::OnBnClickedButtonLogin()
         _rtc_audio_interface->EnableRemoteAudioPacketCallBack(false);
         // 退出房间前，发布停止合流的命令
         if (_contain_admin_flag) {
-            _rtc_room_interface->StopMergeStream();
+            _rtc_room_interface->StopMergeStream(string(), 0);
         }
         if (1 == ((CButton*)GetDlgItem(IDC_CHECK_MERGE))->GetCheck()) {
-            _rtc_room_interface->StopMergeStream(_custom_merge_id);
+            _rtc_room_interface->StopMergeStream(_custom_merge_id, 0);
         }
         _rtc_room_interface->LeaveRoom();
 
@@ -2100,6 +2100,7 @@ void CRtcDemoV2::CreateCustomMergeJob()
     job_desc.min_bitrate    = _merge_config.job_min_bitrate;
     job_desc.max_bitrate    = _merge_config.job_max_bitrate;
     job_desc.stretch_mode = (qiniu_v2::MergeStretchMode)(_merge_config.job_stretch_mode);
+    job_desc.is_hold_last_frame = _merge_config.hold_last_frame;
 
     qiniu_v2::MergeLayer background;
     background.layer_url    = _merge_config.background_url;
@@ -2617,7 +2618,7 @@ void CRtcDemoV2::OnBnClickedButtonForward()
     } else {
         SetDlgItemText(IDC_BUTTON_FORWARD, _T("单流转推"));
         if (_rtc_room_interface) {
-            _rtc_room_interface->StopForwardJob(_custom_forward_id);
+            _rtc_room_interface->StopForwardJob(_custom_forward_id, 0);
             _contain_forward_flag = false;
         }
     }

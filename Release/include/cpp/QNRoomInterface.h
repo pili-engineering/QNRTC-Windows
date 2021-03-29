@@ -323,8 +323,9 @@ namespace qiniu_v2 {
         // 停止所有此房间内的所有合流任务
         // 房间未连接的情况下停止无效
         // @param job_id 合流任务id
+        // @param delay_ms 延迟停止合流时间，单位：ms 
         // @return 0:操作成功，具体合流结果请通过观看旁路直播进行查看 
-        virtual int StopMergeStream(const string& job_id = string()) = 0;
+        virtual int StopMergeStream(const string& job_id, const int delay_ms) = 0;
 
         // 配置媒体传输通道底层传输协议，默认为 preferUdp，当用户网络下 UDP 不通时，SDK 自动降级使用 TCP
         // @param policy_ value of Enum:IcePolicy
@@ -355,15 +356,16 @@ namespace qiniu_v2 {
 
         // 停止单路转推任务
         // @param job_id 单路转推任务 id 
+        // @param delay_ms 延迟停止合流时间，单位：ms 
         // @return 0:操作成功，具体转推结果请通过观看旁路直播进行查看 
-        virtual int StopForwardJob(const string& job_id) = 0;
+        virtual int StopForwardJob(const string& job_id, const int delay_ms) = 0;
 
         // 开启数据统计
         // @param period_ms 每次统计间隔时间，单位毫秒 
         virtual void EnableStatistics(int period_ms) = 0;
 
-        // 设置 dns 域名解析服务器地址 需要在 JoinRoom 之前调用 
-        // @param url_ dns 服务器地址 
+        // 设置 dns 域名解析服务器地址 需要在 JoinRoom 之前调用
+        // @param url_ dns 服务器地址
         virtual void SetDnsServerUrl(const std::string& url_) = 0;
 
     protected:

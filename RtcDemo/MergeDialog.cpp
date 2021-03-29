@@ -36,6 +36,10 @@ BOOL MergeDialog::OnInitDialog()
     ((CComboBox *)GetDlgItem(IDC_COMBO_STRETCH_MODE))->InsertString(-1, utf2unicode("SCALE_TO_FIT").c_str());
     ((CComboBox *)GetDlgItem(IDC_COMBO_STRETCH_MODE))->SetCurSel(0);
 
+    ((CComboBox *)GetDlgItem(IDC_COMBO_HOLD_LAST_FRAME))->InsertString(-1, utf2unicode("NO").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_HOLD_LAST_FRAME))->InsertString(-1, utf2unicode("YES").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_HOLD_LAST_FRAME))->SetCurSel(0);
+
     SetDlgItemText(IDC_EDIT_WATER_URL, utf2unicode(_merge_config.watermark_url).c_str());
     SetDlgItemText(IDC_EDIT_WATER_W, utf2unicode(std::to_string(_merge_config.watermark_width)).c_str());
     SetDlgItemText(IDC_EDIT_WATER_H, utf2unicode(std::to_string(_merge_config.watermark_height)).c_str());
@@ -87,6 +91,8 @@ void MergeDialog::OnBnClickedButtonMergeOk()
     _merge_config.job_fps       = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
 
     _merge_config.job_stretch_mode = ((CComboBox*)GetDlgItem(IDC_COMBO_STRETCH_MODE))->GetCurSel();
+
+    _merge_config.hold_last_frame = ((CComboBox*)GetDlgItem(IDC_COMBO_HOLD_LAST_FRAME))->GetCurSel();
 
     GetDlgItemText(IDC_EDIT_MERGE_BITRATE, tmp_cstr);
     _merge_config.job_bitrate   = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str()) * 1000;
