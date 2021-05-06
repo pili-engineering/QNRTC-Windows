@@ -250,7 +250,7 @@ namespace qiniu_v2 {
         // 获取音频功能接口 QNAudioInterface 实例指针，以进行音频相关操作 
         virtual QNAudioInterface* ObtainAudioInterface() = 0;
 
-        // 配置信令信令间隔，影响监控网络断开的灵敏度
+        // 配置信令间隔，影响监控网络断开的灵敏度
         // 间隔越低，越可以更快的检测到网络断开
         // @param interval_seconds_ 信令心跳间隔，可设置范围为 1~ 10；单位：秒 
         virtual void SetHeartBeatInterval(int interval_seconds_ = 3) = 0;
@@ -364,8 +364,8 @@ namespace qiniu_v2 {
         // @param period_ms 每次统计间隔时间，单位毫秒 
         virtual void EnableStatistics(int period_ms) = 0;
 
-        // 设置 dns 域名解析服务器地址 需要在 JoinRoom 之前调用
-        // @param url_ dns 服务器地址
+        // 设置 dns 域名解析服务器地址 需要在 JoinRoom 之前调用 
+        // @param url_ dns 服务器地址 
         virtual void SetDnsServerUrl(const std::string& url_) = 0;
 
     protected:

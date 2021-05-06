@@ -67,7 +67,7 @@ namespace qiniu_v2 {
     // 合流画面填充方式 
     enum MergeStretchMode
     {
-        ASPECT_INVALID = -1, // 无效值
+        ASPECT_INVALID = -1, // 无效值 
         ASPECT_FILL  = 0,   // 在保持长宽比的前提下，缩放视频，使其充满容器 
         ASPECT_FIT   = 1,   // 在保持长宽比的前提下，缩放视频，使其在容器内完整显示，边缘部分填充黑边 
         SCALE_TO_FIT = 2,   // 缩放视频，使其填充满容器，可能导致拉伸变形 
@@ -102,7 +102,7 @@ namespace qiniu_v2 {
         int bitrate = 0;            // 合流码率bps 
         int min_bitrate = 0;        // 最小码率 
         int max_bitrate = 0;        // 最大码率 
-        bool is_hold_last_frame = false; //合流停止时是否保持最后一帧画面 
+        bool is_hold_last_frame = false; // 合流停止时是否保持最后一帧画面 
         MergeStretchMode stretch_mode = ASPECT_FILL;
     };
 
@@ -369,7 +369,6 @@ namespace qiniu_v2 {
         {
             return multi_stream_enable;
         }
-
 
     protected:
         QNTrackInfo() {}
