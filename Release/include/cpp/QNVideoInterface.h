@@ -409,11 +409,11 @@ namespace qiniu_v2
         // @return 成功返回 0，失败返回值小于 0 
         virtual int CameraCaptureMirror(bool mirror_flag_) = 0;
 
-        // 支持自定义 video sei 数据插入，在使用合流功能时插入SEI，必须要保证
-        // 合流时设置的帧率不超过连麦时的帧率。
-        // @param tracks_id_list_ 支持设置 sei 的 track id 链表
+        // 支持自定义 video sei 数据插入，在使用合流功能时插入SEI，必须要保证 
+        // 合流时设置的帧率不超过连麦时的帧率。 
+        // @param tracks_id_list_ 支持设置 sei 的 track id 链表 
         // @param video_sei_content_ 被插入的 sei 数据 
-        // @param video_sei_repeat_times_  当前 sei 数据被插入的次数，-1 表示持续插入。
+        // @param video_sei_repeat_times_  当前 sei 数据被插入的次数，-1 表示持续插入。 
         virtual void SetLocalVideoSei(
             const list<string>& tracks_id_list_,
             const std::string& video_sei_content_,
