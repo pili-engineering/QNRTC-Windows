@@ -198,6 +198,9 @@ namespace qiniu_v2
 /* Video capture module not running*/
 #define Err_VideoCapture_Not_Running 11050
 
+/* No supportable hardware encoder*/
+#define Err_Not_Support_Hardware_Encoder 11051
+
 /* Create offer sdp failed*/
 #define Err_CreateOffer_Failed 11060
 

@@ -200,6 +200,8 @@ private:
 
     virtual void OnRemoteUserReconnected(const std::string& remote_user_id_);
 
+    virtual void OnTrackMute(bool server_mute_flag_, bool local_mute_flag_, qiniu_v2::QNTrackInfo& trackInfo_);
+
     virtual void OnUnPublishTracksResult(
         const qiniu_v2::TrackInfoList& track_list_
     );
