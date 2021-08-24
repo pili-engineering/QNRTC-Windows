@@ -193,6 +193,12 @@ namespace qiniu_v2 {
             // @param remote_user_id_ 远端用户 id 
             virtual void OnRemoteUserReconnected(const std::string& remote_user_id_) = 0;
 
+            // mute/unmute 状态信息回调 
+            // @param server_mute 是否是服务端通知 mute/unmute, true: mute, false:unmute 
+            // @param local_mute  是否是用户自己 mute/unmute, true: mute, false:unmute 
+            // @param trackInfo trackInfo  当前 mute/unmute 的 track 
+            virtual void OnTrackMute(bool server_mute_flag_, bool local_mute_flag_, QNTrackInfo& trackInfo_) = 0;
+
         protected:
             virtual ~QNRoomListener() {}
         };
@@ -218,7 +224,6 @@ namespace qiniu_v2 {
             const std::string& dir_name_,
             const std::string& file_name_
         );
-
     public:
         // 消息循环驱动，必须由开发者在上层循环调用
         // 建议由开发者在上层主线程定时调用以触发所有事件，否则所有的事件将不会触发 
@@ -250,7 +255,7 @@ namespace qiniu_v2 {
         // 获取音频功能接口 QNAudioInterface 实例指针，以进行音频相关操作 
         virtual QNAudioInterface* ObtainAudioInterface() = 0;
 
-        // 配置信令信令间隔，影响监控网络断开的灵敏度
+        // 配置信令间隔，影响监控网络断开的灵敏度 
         // 间隔越低，越可以更快的检测到网络断开
         // @param interval_seconds_ 信令心跳间隔，可设置范围为 1~ 10；单位：秒 
         virtual void SetHeartBeatInterval(int interval_seconds_ = 3) = 0;
@@ -364,8 +369,8 @@ namespace qiniu_v2 {
         // @param period_ms 每次统计间隔时间，单位毫秒 
         virtual void EnableStatistics(int period_ms) = 0;
 
-        // 设置 dns 域名解析服务器地址 需要在 JoinRoom 之前调用
-        // @param url_ dns 服务器地址
+        // 设置 dns 域名解析服务器地址 需要在 JoinRoom 之前调用 
+        // @param url_ dns 服务器地址 
         virtual void SetDnsServerUrl(const std::string& url_) = 0;
 
     protected:

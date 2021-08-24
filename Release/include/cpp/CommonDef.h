@@ -67,7 +67,7 @@ namespace qiniu_v2 {
     // 合流画面填充方式 
     enum MergeStretchMode
     {
-        ASPECT_INVALID = -1, // 无效值
+        ASPECT_INVALID = -1, // 无效值 
         ASPECT_FILL  = 0,   // 在保持长宽比的前提下，缩放视频，使其充满容器 
         ASPECT_FIT   = 1,   // 在保持长宽比的前提下，缩放视频，使其在容器内完整显示，边缘部分填充黑边 
         SCALE_TO_FIT = 2,   // 缩放视频，使其填充满容器，可能导致拉伸变形 
@@ -102,7 +102,7 @@ namespace qiniu_v2 {
         int bitrate = 0;            // 合流码率bps 
         int min_bitrate = 0;        // 最小码率 
         int max_bitrate = 0;        // 最大码率 
-        bool is_hold_last_frame = false; //合流停止时是否保持最后一帧画面 
+        bool is_hold_last_frame = false; // 合流停止时是否保持最后一帧画面 
         MergeStretchMode stretch_mode = ASPECT_FILL;
     };
 
@@ -139,6 +139,11 @@ namespace qiniu_v2 {
         // 以下两个成员为音频 track 参数，仅当 is_video 为 false 时有效 
         int         audio_bitrate = 0;              // 音频码率，单位：bps
         float       audio_packet_lost_rate = 0.0f;  // 音频丢包率 
+        uint64_t    audio_packets_received = 0;     // 接收到的音频媒体包数 
+        uint64_t    audio_red_packets_sent = 0;     // 发送端发送的 redundant packet 个数 
+        uint64_t    audio_packets_sent = 0;         // 音频包发送个数 
+        uint64_t    total_samples_received = 0;     // 接收到的音频 sample 个数 
+        uint64_t    concealed_samples = 0;          // 接收到的音频失效 sample 个数 
 
         // 以下成员为视频 track 参数，仅当 is_video 为 true 时有效 
         int         video_width = 0;                // 视频宽度 
@@ -148,6 +153,13 @@ namespace qiniu_v2 {
         float       video_packet_lost_rate = 0.0f;  // 丢包率 
         int64_t     out_rtt = 0;                    // 数据从发送到接收端的往返延迟 
         int         network_grade;                  // 网络质量  1 - 优 2 - 良 3 - 中等 4 - 差 
+        float       video_stall_rate = 0;           // 视频卡顿率 
+        uint64_t    video_packets_received = 0;     // 接收到的视频媒体包数 
+        uint64_t    video_fec_packets_received = 0; // 接收到的视频 fec 包数 
+        uint64_t    video_packets_sent = 0;         // 视频包发送个数 
+        uint64_t    video_fec_packets_sent = 0;     // 发送端发送的 fec packet 个数 
+        uint64_t    video_total_frames_duration = 0; // 接收端接收到的视频包总时长 
+        uint64_t    video_total_freezes_duration = 0; // 接收端视频空闲时长 
     };
 
     //自定义消息接收回调信息 
@@ -162,7 +174,7 @@ namespace qiniu_v2 {
     struct QNTrackLayerSubConfig {
         QNTrackProfile mProfile;   // 当前 profile 
         bool mChooseToSub;         // 是否需要切换为当前的 profile 
-        bool mMaintainLayer;       // 开启后，订阅端 profile 会随网络自动切换 （暂时不支持） 
+        bool mMaintainLayer;       // 开启后，订阅端 profile 不会随网络自动切换 （暂时不支持） 
         bool mActive;              // 当前 profile 为生效状态 
     };
 
@@ -369,7 +381,6 @@ namespace qiniu_v2 {
         {
             return multi_stream_enable;
         }
-
 
     protected:
         QNTrackInfo() {}

@@ -131,6 +131,20 @@ namespace qiniu_v2
         VideoCaptureType raw_type;
     };
 
+    enum VideoEncodeType
+    {
+        kEncodedefault,       // 默认 Open264 编码器 
+        kEncodeQsv,           // Intel  集显编码器 
+        kEncodeNvenc,         // NVIDIA 独显编码器 
+    };
+
+    typedef std::vector<VideoEncodeType> EncoderCapabilityVec;
+
+    struct EncoderCapabilityInfo
+    {
+        EncoderCapabilityVec capability_vec;
+    };
+
     // 视频模块功能接口，开发者可以进行视频相关控制
     // 由 QNRoomInterface::ObtainVideoInterface 获取
     // QNRoomInterface::DestroyRoomInterface 后自动释放 
@@ -336,44 +350,20 @@ namespace qiniu_v2
             unsigned int& dest_data_size_
         ) = 0;
 
-        // 激活或关闭 SDK 内 D3D 视频渲染模式，默认为开启模式
+        // 激活或关闭 SDK 内 D3D 视频渲染模式，默认为开启模式 
         // 关闭后将使用 GDI 进行渲染，效果比 D3D 要差，但兼容性更高一些 
         virtual void EnableD3dRender(bool enable_d3d_ = true) = 0;
 
-        // 配置 SDK 是否使用外置视频编解码器，需在 JoinRoom 前调用
-        // @param enable_ 是否使用外置编解码器
-        // @return 成功返回 0，否则请参考错误码列表 
-        virtual int EnableExternalVideoCodec(bool enable_) = 0;
+        // 获取当前支持的编码器 
+        // @return 返回支持的编码器能力集信息 
+        virtual const EncoderCapabilityInfo& GetSupportEncoder() = 0;
 
-        // 当需要导入外部 H.264 裸码流时，需在 PublishTracks 成功后调用此接口初始化 SDK 内部结构
-        /** example:
-        auto video_track_ptr = qiniu_v2::QNTrackInfo::CreateVideoTrackInfo(
-            "", EXTERNAL_TAG, NULL, width, height, fps, bitrate, qiniu_v2::tst_ExternalH264, false);
-        qiniu_v2::TrackInfoList track_list;
-        track_list.emplace_back(video_track_ptr);
-        auto ret = _rtc_room_interface->PublishTracks(track_list);
-        if (ret != 0) {
-            Failed...
-        }
-        video_track_ptr->Release();
-        **/
-        // @param width_ 图像宽度
-        // @param height_ 图像高度
-        // @param max_fps_ 帧率
-        // @param max_bitrate_ 最大码率
-        // @return 成功返回 0，否则请参考错误码列表
-        virtual int InitExternalEncoder(
-            int32_t width_,
-            int32_t height_, 
-            int32_t max_fps_, 
-            int32_t max_bitrate_
-        ) = 0;
-        
-        // 导入外部 H.264 裸码流时，首先调用， PublishTracks 成功后，调用此接口初始化 SDK 内部相关参数
-        // @param nals_ptr Nalu 指针数组
-        // @param nals_size nals_ptr 中数组元素个数
+        // 配置 SDK 是使用的视频编解码器类型，需在 JoinRoom 前调用，不设置的话默认使用 Open264 编码器 
+        // 注意：如果需要切换其他编码器，需要在退出房间时调用 DestroyRoomInterface 彻底 
+        // 释放释放资源，再重新创建房间； kEncodeQsv 和 kEncodeNvenc 不支持多流功能。 
+        // @param encode_type_ 编码器类型 
         // @return 成功返回 0，否则请参考错误码列表 
-        virtual int InputH264Frame(H264Nal** nals_ptr_, unsigned int nals_size_, uint8_t is_key_frame_) = 0;
+        virtual int SetVideoEncoder(VideoEncodeType encode_type_) = 0;
 
         // 原始帧处理功能接口：裁剪和缩放，设置参数要求如下，如果设置不正确，则输出原始图像，OnVideoFrame 回调接口中会有输出宽高体现 
         // @param src_capturer_source 数据源类型，目前只支持摄像头采集和用户外部导入的 kRGB24、kYUY2、kI420 数据 
@@ -409,15 +399,21 @@ namespace qiniu_v2
         // @return 成功返回 0，失败返回值小于 0 
         virtual int CameraCaptureMirror(bool mirror_flag_) = 0;
 
-        // 支持自定义 video sei 数据插入，在使用合流功能时插入SEI，必须要保证
-        // 合流时设置的帧率不超过连麦时的帧率。
-        // @param tracks_id_list_ 支持设置 sei 的 track id 链表
+        // 支持自定义 video sei 数据插入，在使用合流功能时插入SEI，必须要保证 
+        // 合流时设置的帧率不超过连麦时的帧率。 
+        // @param tracks_id_list_ 支持设置 sei 的 track id 链表 
         // @param video_sei_content_ 被插入的 sei 数据 
-        // @param video_sei_repeat_times_  当前 sei 数据被插入的次数，-1 表示持续插入。
+        // @param video_uuid_ sei uuid, 16 个字节, 如果传空字符串或者字符串长度不为 16 个字节，则使用默认的 uuid 
+        // @param video_sei_repeat_times_  当前 sei 数据被插入的次数，-1 表示持续插入。 
         virtual void SetLocalVideoSei(
             const list<string>& tracks_id_list_,
             const std::string& video_sei_content_,
+            const std::string& video_uuid_,
             const int video_sei_repeat_times_) = 0;
+
+        // 是否开启 D3D 窗口采集，默认关闭，捕获某些使用 D3D 创建的窗口时需要开启，否则捕获不到画面 
+        // @param enable_ 是否开启， true or false 
+        virtual void EnableWindowGraphicsCapture(bool enable_) = 0;
     protected:
         virtual ~QNVideoInterface() {}
     };

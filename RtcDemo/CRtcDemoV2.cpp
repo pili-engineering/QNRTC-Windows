@@ -111,7 +111,14 @@ BOOL CRtcDemoV2::OnInitDialog()
     SetTimer(CHECK_CALLBACK_TIMER, 10, nullptr);
 
     InitUI();
-
+    // 开启硬编功能
+    qiniu_v2::EncoderCapabilityInfo encode_cap_info = _rtc_video_interface->GetSupportEncoder();
+    qiniu_v2::VideoEncodeType hw_type = qiniu_v2::kEncodeNvenc;
+    for (auto itor : encode_cap_info.capability_vec) {
+        if (itor == hw_type) {
+            _rtc_video_interface->SetVideoEncoder(hw_type);
+        }
+    }
     return TRUE;
 }
 
@@ -650,20 +657,20 @@ void CRtcDemoV2::OnRemoteStatisticsUpdated(const qiniu_v2::StatisticsReportList&
         if (itor.is_video) {
             _snwprintf(dest_buf,
                 sizeof(dest_buf),
-                _T("用户:%s, Track Id:%s, 视频: rtt:%I64d, 丢包率:%0.3f"),
+                _T("[远端上行视频]-用户:%s,Track Id:%s,rtt:%I64d,丢包率:%0.1f"),
                 utf2unicode(itor.user_id).c_str(),
                 utf2unicode(itor.track_id).c_str(),
                 itor.out_rtt,
-                itor.video_packet_lost_rate
+                itor.video_packet_lost_rate * 100
             );
         } else {
             _snwprintf(dest_buf,
                 sizeof(dest_buf),
-                _T("用户:%s, Track Id:%s, 音频: rtt:%I64d, 丢包率:%0.3f"),
+                _T("[远端上行音频]-用户:%s,Track Id:%s,rtt:%I64d,丢包率:%0.1f"),
                 utf2unicode(itor.user_id).c_str(),
                 utf2unicode(itor.track_id).c_str(),
                 itor.out_rtt,
-                itor.audio_packet_lost_rate
+                itor.audio_packet_lost_rate * 100
             );
         }
 
@@ -845,34 +852,41 @@ void CRtcDemoV2::OnStopForwardResult(
 
 void CRtcDemoV2::OnRemoteUserReconnecting(const std::string& remote_user_id_)
 {
-    thread(
-        [&, remote_user_id_] {
-        wchar_t buf[512] = { 0 };
 
-        _snwprintf(buf,
-            sizeof(buf),
-            _T("%s 用户正在重连"),
-            utf2unicode(remote_user_id_).c_str()
-        );
-        AfxMessageBox(buf, MB_OK);
-    }
-    ).detach();
+    wchar_t buf[512] = { 0 };
+    _snwprintf(buf,
+        sizeof(buf),
+        _T("%s 用户正在重连"),
+        utf2unicode(remote_user_id_).c_str()
+    );
+    _wnd_status_bar.SetText(buf, 1, 0);
 }
 
 void CRtcDemoV2::OnRemoteUserReconnected(const std::string& remote_user_id_)
 {
-    thread(
-        [&, remote_user_id_] {
-        wchar_t buf[512] = { 0 };
 
-        _snwprintf(buf,
-            sizeof(buf),
-            _T("%s 用户重连成功"),
-            utf2unicode(remote_user_id_).c_str()
-        );
-        AfxMessageBox(buf, MB_OK);
-    }
-    ).detach();
+    wchar_t buf[512] = { 0 };
+    _snwprintf(buf,
+        sizeof(buf),
+        _T("%s 用户重连成功"),
+        utf2unicode(remote_user_id_).c_str()
+    );
+    _wnd_status_bar.SetText(buf, 1, 0);
+}
+
+void CRtcDemoV2::OnTrackMute(bool server_mute_flag_, bool local_mute_flag_, qiniu_v2::QNTrackInfo& trackInfo_)
+{
+    wchar_t buff[1024] = { 0 };
+    _snwprintf(
+        buff,
+        1024,
+        _T("server flag : %d, local flag : %d, mute : %d, Track Id : %s"),
+        server_mute_flag_,
+        local_mute_flag_,
+        trackInfo_.IsMuted(),
+        utf2unicode(trackInfo_.GetTrackId()).c_str()
+    );
+    _wnd_status_bar.SetText(buff, 1, 0);
 }
 
 void CRtcDemoV2::OnSubscribeTracksResult(int error_code_, 
@@ -1159,26 +1173,58 @@ void CRtcDemoV2::OnStatisticsUpdated(const qiniu_v2::StatisticsReport& statistic
 {
     wchar_t dest_buf[1024] = { 0 };
     if (statistics_.is_video) {
-        _snwprintf(dest_buf,
-            sizeof(dest_buf),
-            _T("用户:%s, Track Id:%s 视频: 分辨率:%d*%d, 帧率:%d, 码率:%d kbps, 丢包率:%0.3f"),
-            utf2unicode(statistics_.user_id).c_str(),
-            utf2unicode(statistics_.track_id).c_str(),
-            statistics_.video_width,
-            statistics_.video_height,
-            statistics_.video_frame_rate,
-            statistics_.video_bitrate / 1024,
-            statistics_.video_packet_lost_rate
-        );
+        if ((statistics_.user_id).compare(unicode2utf(_user_id.GetBuffer())) == 0) {
+            _snwprintf(dest_buf,
+                sizeof(dest_buf),
+                _T("[发布video]-TrackId:%s,分辨率:%d*%d,帧率:%d,码率:%d kbps,丢包率:%0.1f,媒体包数:%I64d,Fec包数:%I64d"),
+                utf2unicode(statistics_.track_id).c_str(),
+                statistics_.video_width,
+                statistics_.video_height,
+                statistics_.video_frame_rate,
+                statistics_.video_bitrate / 1024,
+                statistics_.video_packet_lost_rate * 100,
+                statistics_.video_packets_sent,
+                statistics_.video_fec_packets_sent
+            );
+        } else {
+            _snwprintf(dest_buf,
+                sizeof(dest_buf),
+                _T("[订阅video]-TrackId:%s,分辨率:%d*%d,帧率:%d,码率:%d kbps,丢包率:%0.1f,媒体包数:%I64d,Fec包数:%I64d,卡顿率:%0.1f"),
+                utf2unicode(statistics_.track_id).c_str(),
+                statistics_.video_width,
+                statistics_.video_height,
+                statistics_.video_frame_rate,
+                statistics_.video_bitrate / 1024,
+                statistics_.video_packet_lost_rate * 100,
+                statistics_.video_packets_received,
+                statistics_.video_fec_packets_received,
+                statistics_.video_total_frames_duration > 0 ? 
+                (statistics_.video_total_freezes_duration * 1.0f / statistics_.video_total_frames_duration * 100) : 0
+            );
+        }
     } else {
-        _snwprintf(dest_buf,
-            sizeof(dest_buf),
-            _T("用户:%s, Track Id:%s, 音频：码率:%d kbps, 丢包率:%0.3f"),
-            utf2unicode(statistics_.user_id).c_str(),
-            utf2unicode(statistics_.track_id).c_str(),
-            statistics_.audio_bitrate / 1024,
-            statistics_.audio_packet_lost_rate
-        );
+        if ((statistics_.user_id).compare(unicode2utf(_user_id.GetBuffer())) == 0) {
+            _snwprintf(dest_buf,
+                sizeof(dest_buf),
+                _T("[发布audio]-TrackId:%s,码率:%d kbps,丢包率:%0.1f,媒体包数:%I64d,Red包数:%I64d"),
+                utf2unicode(statistics_.track_id).c_str(),
+                statistics_.audio_bitrate / 1024,
+                statistics_.audio_packet_lost_rate * 100,
+                statistics_.audio_packets_sent,
+                statistics_.audio_red_packets_sent
+            );
+        } else {
+            _snwprintf(dest_buf,
+                sizeof(dest_buf),
+                _T("[订阅audio]-TrackId:%s,码率:%d kbps,丢包率:%0.1f,媒体包数:%I64d,卡顿率:%0.1f"),
+                utf2unicode(statistics_.track_id).c_str(),
+                statistics_.audio_bitrate / 1024,
+                statistics_.audio_packet_lost_rate * 100,
+                statistics_.audio_packets_received,
+                statistics_.total_samples_received > 0 ? 
+                (statistics_.concealed_samples * 1.0f / statistics_.total_samples_received * 100) : 0
+            );
+        }
     }
 
     TRACE(dest_buf);
@@ -1648,8 +1694,8 @@ CHECK_SCREEN:
             GetDlgItem(IDC_STATIC_VIDEO_PREVIEW2)->m_hWnd,
             640,
             480,
-            30,
-            500000,
+            25,
+            2000000,
             qiniu_v2::tst_ScreenCasts,
             false,
             false
@@ -1825,8 +1871,8 @@ void CRtcDemoV2::OnBnClickedCheckScreen()
             GetDlgItem(IDC_STATIC_VIDEO_PREVIEW2)->m_hWnd,
             640,
             480,
-            30,
-            300000,
+            25,
+            2000000,
             qiniu_v2::tst_ScreenCasts,
             false,
             false
@@ -2672,12 +2718,13 @@ void CRtcDemoV2::OnBnClickedBtnSei()
     }
 
     if (tracks_id_list.size() != 0) {
+        string uuid = "\x14\x16\x17\x18\x14\x16\x17\x28\x14\x16\x17\x38\x14\x16\x17\x58";
         if (btn_str.CompareNoCase(_T("开启SEI")) == 0) {
             SetDlgItemText(IDC_BTN_SEI, _T("关闭SEI"));
-            _rtc_video_interface->SetLocalVideoSei(tracks_id_list, string_to_utf8("七牛SEI" + std::to_string(rand())), -1);
+            _rtc_video_interface->SetLocalVideoSei(tracks_id_list, string_to_utf8("七牛SEI" + std::to_string(rand())), uuid , -1);
         } else {
             SetDlgItemText(IDC_BTN_SEI, _T("开启SEI"));
-            _rtc_video_interface->SetLocalVideoSei(tracks_id_list, "", 0);
+            _rtc_video_interface->SetLocalVideoSei(tracks_id_list, "", uuid, 0);
         }
     }
 }

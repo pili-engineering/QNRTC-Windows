@@ -8,7 +8,7 @@ using namespace std;
 
 #ifdef UNICODE
 
-inline wstring utf2unicode(string str)
+inline wstring utf2unicode(const string str)
 {
     //获取缓冲区的大小，并申请空间，缓冲区大小是按字符计算的 
     int len=MultiByteToWideChar(CP_ACP,0,str.c_str(),str.size(),NULL,0);
