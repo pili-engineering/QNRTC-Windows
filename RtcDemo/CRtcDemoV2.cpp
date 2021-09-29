@@ -20,8 +20,8 @@ UINT TrackInfoUI::WINDOW_ID = 1000000;
 #define CAMERA_TAG "camera"
 #define MICROPHONE_TAG "microphone"
 #define SCREENCASTS_TAG "screen"
-#define EXTERNAL_TAG "external"
-
+#define EXTERNAL_VIDEO "external_video"
+#define EXTERNAL_AUDIO "external_audio"
 
 // CRtcDemoV2 dialog
 
@@ -83,7 +83,6 @@ void CRtcDemoV2::DoDataExchange(CDataExchange* pDX)
 {
     CDialogEx::DoDataExchange(pDX);
     DDX_Control(pDX, IDC_LIST_PLAYER, _user_list_ctrl);
-    DDX_Control(pDX, IDC_RICHEDIT_MSG, _msg_rich_edit_ctrl);
 }
 
 BOOL CRtcDemoV2::OnInitDialog()
@@ -91,34 +90,20 @@ BOOL CRtcDemoV2::OnInitDialog()
     CDialogEx::OnInitDialog();
     
     ReadConfigFile();
-
     std::string ver;
-    qiniu_v2::QNRoomInterface::GetVersion(ver);
+    qiniu::QNRTC::GetVersion(ver);
     TRACE("Sdk version: %s", ver.c_str());
-    qiniu_v2::QNRoomInterface::SetLogParams(qiniu_v2::LOG_INFO, "rtc_log", "rtc.log");
-    
-    _rtc_room_interface = qiniu_v2::QNRoomInterface::ObtainRoomInterface();
-    _rtc_room_interface->SetRoomListener(this);
-    _rtc_room_interface->EnableStatistics(1000);
+    QNRTC::SetLogFileEnabled(qiniu::LOG_INFO, "rtc_log", "rtc.log");
+    _rtc_client_ptr = QNRTC::CreateClient();
+    _rtc_client_ptr->SetQNClientEventListener(this);
+    _rtc_client_ptr->SetQNPublishResultCallback(this);
+    _rtc_client_ptr->SetLiveStreamingListener(this);
 
-    _rtc_video_interface = _rtc_room_interface->ObtainVideoInterface();
-    _rtc_video_interface->SetVideoListener(this);
-    _rtc_audio_interface = _rtc_room_interface->ObtainAudioInterface();
-    _rtc_audio_interface->SetAudioListener(this);
-        
     // 定义一个定时器，在主线程定时执行 QNRoomInterface::Loop() 方法，以触发各种回调
     // 目的是为了让 SDK 的回调在主线程中执行，以方便 UI 操作
     SetTimer(CHECK_CALLBACK_TIMER, 10, nullptr);
 
     InitUI();
-    // 开启硬编功能
-    qiniu_v2::EncoderCapabilityInfo encode_cap_info = _rtc_video_interface->GetSupportEncoder();
-    qiniu_v2::VideoEncodeType hw_type = qiniu_v2::kEncodeNvenc;
-    for (auto itor : encode_cap_info.capability_vec) {
-        if (itor == hw_type) {
-            _rtc_video_interface->SetVideoEncoder(hw_type);
-        }
-    }
     return TRUE;
 }
 
@@ -138,7 +123,6 @@ BEGIN_MESSAGE_MAP(CRtcDemoV2, CDialogEx)
     ON_BN_CLICKED(IDC_CHECK_AUDIO, &CRtcDemoV2::OnBnClickedCheckAudio)
     ON_BN_CLICKED(IDC_CHECK_IMPORT_RAW_DATA, &CRtcDemoV2::OnBnClickedCheckImportRawData)
     ON_BN_CLICKED(IDC_CHECK_DESKTOP_AUDIO, &CRtcDemoV2::OnBnClickedCheckDesktopAudio)
-    ON_BN_CLICKED(IDC_BTN_KICKOUT, &CRtcDemoV2::OnBnClickedBtnKickout)
     ON_BN_CLICKED(IDC_CHECK_MUTE_AUDIO, &CRtcDemoV2::OnBnClickedCheckMuteAudio)
     ON_BN_CLICKED(IDC_CHECK_MUTE_VIDEO, &CRtcDemoV2::OnBnClickedCheckMuteVideo)
     ON_WM_HSCROLL()
@@ -151,10 +135,20 @@ BEGIN_MESSAGE_MAP(CRtcDemoV2, CDialogEx)
     ON_CBN_SELCHANGE(IDC_COMBO_SUBSCRIBE_PROFILE, &CRtcDemoV2::OnCbnSelchangeComboSubscribeProfile)
     ON_BN_CLICKED(IDC_BUTTON_SIMULCAST, &CRtcDemoV2::OnBnClickedButtonSimulcast)
     ON_BN_CLICKED(IDC_BUTTON_FORWARD, &CRtcDemoV2::OnBnClickedButtonForward)
-    ON_BN_CLICKED(IDC_BUTTON_EXTRA_DATA, &CRtcDemoV2::OnBnClickedButtonExtraData)
     ON_BN_CLICKED(IDC_CHECK_CAMERA_IMAGE, &CRtcDemoV2::OnBnClickedCheckCameraImage)
     ON_BN_CLICKED(IDC_CHECK_CAMERA_MIRROR, &CRtcDemoV2::OnBnClickedCheckCameraMirror)
     ON_BN_CLICKED(IDC_BTN_SEI, &CRtcDemoV2::OnBnClickedBtnSei)
+    ON_BN_CLICKED(IDC_CHECK_IMPORT_RAW_AUDIO_DATA, &CRtcDemoV2::OnBnClickedCheckImportRawAudioData)
+    ON_BN_CLICKED(IDC_CHECK_LOCAL_MIRROR, &CRtcDemoV2::OnBnClickedCheckLocalMirror)
+    ON_BN_CLICKED(IDC_CHECK_REMOTE_MIRROR, &CRtcDemoV2::OnBnClickedCheckRemoteMirror)
+    ON_CBN_SELCHANGE(IDC_COMBO_LOCAL_STRETCH_MODE, &CRtcDemoV2::OnCbnSelchangeComboLocalStretchMode)
+    ON_CBN_SELCHANGE(IDC_COMBO_REMOTE_STRETCH_MODE, &CRtcDemoV2::OnCbnSelchangeComboRemoteStretchMode)
+    ON_BN_CLICKED(IDC_CHECK_CLIP, &CRtcDemoV2::OnBnClickedCheckClip)
+    ON_BN_CLICKED(IDC_CHECK_SCALE, &CRtcDemoV2::OnBnClickedCheckScale)
+    ON_BN_CLICKED(IDC_CHECK_MERGE, &CRtcDemoV2::OnBnClickedCheckMerge)
+    ON_BN_CLICKED(IDC_CHECK_IMPORT_STATS, &CRtcDemoV2::OnBnClickedCheckImportStats)
+    ON_BN_CLICKED(IDC_CHECK_HARD_ENCODER, &CRtcDemoV2::OnBnClickedCheckHardEncoder)
+    ON_BN_CLICKED(IDC_BTN_KICKOUT, &CRtcDemoV2::OnBnClickedBtnKickout)
 END_MESSAGE_MAP()
 
 
@@ -163,21 +157,27 @@ END_MESSAGE_MAP()
 void CRtcDemoV2::OnDestroy()
 {
     // 结束外部数据导入的线程
-    _stop_external_flag = true;
+    if (_stats_pDig) {
+        _stats_pDig->DestroyWindow();
+        delete _stats_pDig;
+        _stats_pDig = nullptr;
+    }
+    _stop_stats_flag = true;
+    _stop_video_external_flag = true;
+    _stop_audio_external_flag = true;
     if (_fake_audio_thread.joinable()) {
         _fake_audio_thread.join();
     }
     if (_fake_video_thread.joinable()) {
         _fake_video_thread.join();
     }
-    // 释放 RTC SDK 资源
-    if (_rtc_room_interface) {
-        StopPublish();
-        // 注意在调用 LeaveRoom 之前，用户需确保sdk的回调接口已处理并返回,
-        // 否则 LeaveRoom 容易阻塞。
-        _rtc_room_interface->LeaveRoom();
-        qiniu_v2::QNRoomInterface::DestroyRoomInterface(_rtc_room_interface);
-        _rtc_room_interface = nullptr;
+    if (_stats_thread.joinable()) {
+        _stats_thread.join();
+    }
+    Leave();
+    if (_rtc_client_ptr) {
+        QNRTC::DestroyRtcClient(_rtc_client_ptr);
+        _rtc_client_ptr = nullptr;
     }
     CDialogEx::OnDestroy();
 }
@@ -195,8 +195,8 @@ void CRtcDemoV2::OnTimer(UINT_PTR nIDEvent)
 {
     if (CHECK_CALLBACK_TIMER == nIDEvent) {
         // SDK 事件驱动器
-        if (_rtc_room_interface) {
-            _rtc_room_interface->Loop();
+        if (_rtc_client_ptr) {
+            _rtc_client_ptr->Loop();
         }
     } else if (UPDATE_TIME_DURATION_TIMER == nIDEvent) {
         // 更新连麦时间
@@ -262,11 +262,7 @@ void CRtcDemoV2::WriteConfigFile()
 
 void CRtcDemoV2::InitUI()
 {
-    GetDlgItem(IDC_BUTTON_SEND_MSG)->EnableWindow(FALSE);
-    GetDlgItem(IDC_COMBO_LOCAL_ROTATION)->EnableWindow(FALSE);
-    GetDlgItem(IDC_COMBO_REMOTE_ROTATION)->EnableWindow(FALSE);
     GetDlgItem(IDC_BUTTON_FORWARD)->EnableWindow(FALSE);
-    GetDlgItem(IDC_BUTTON_EXTRA_DATA)->EnableWindow(TRUE);
     ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_ROTATION))->InsertString(-1, utf2unicode("0").c_str());
     ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_ROTATION))->InsertString(-1, utf2unicode("90").c_str());
     ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_ROTATION))->InsertString(-1, utf2unicode("180").c_str());
@@ -287,6 +283,16 @@ void CRtcDemoV2::InitUI()
     ((CComboBox *)GetDlgItem(IDC_COMBO_CLIP_CROP))->InsertString(-1, utf2unicode("camera").c_str());
     ((CComboBox *)GetDlgItem(IDC_COMBO_CLIP_CROP))->InsertString(-1, utf2unicode("video external").c_str());
     ((CComboBox *)GetDlgItem(IDC_COMBO_CLIP_CROP))->SetCurSel(0);
+
+    ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_STRETCH_MODE))->InsertString(-1, utf2unicode("ASPECT_FIT").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_STRETCH_MODE))->InsertString(-1, utf2unicode("ASPECT_FILL").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_STRETCH_MODE))->InsertString(-1, utf2unicode("SCALE_FIT").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_STRETCH_MODE))->SetCurSel(0);
+
+    ((CComboBox *)GetDlgItem(IDC_COMBO_REMOTE_STRETCH_MODE))->InsertString(-1, utf2unicode("ASPECT_FIT").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_REMOTE_STRETCH_MODE))->InsertString(-1, utf2unicode("ASPECT_FILL").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_REMOTE_STRETCH_MODE))->InsertString(-1, utf2unicode("SCALE_FIT").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_REMOTE_STRETCH_MODE))->SetCurSel(0);
 
     if (_enable_simulcast) {
         SetDlgItemText(IDC_BUTTON_SIMULCAST, _T("关闭多流"));
@@ -316,60 +322,58 @@ void CRtcDemoV2::InitUI()
     _user_list_ctrl.InsertColumn(1, _T("用户发布流状态"), LVCFMT_LEFT, 350, 1);
 
     // 初始化视频采集设备 combobox
-    int camera_count = _rtc_video_interface->GetCameraCount();
+    int camera_count = _rtc_client_ptr->GetCameraCount();
     for (int i(0); i < camera_count; ++i) {
-        qiniu_v2::CameraDeviceInfo ci = _rtc_video_interface->GetCameraInfo(i);
+        qiniu::QNCameraDeviceInfo ci = _rtc_client_ptr->GetCameraInfo(i);
         _camera_dev_map[ci.device_id] = ci;
         ((CComboBox *)GetDlgItem(IDC_COMBO_CAMERA))->InsertString(-1, utf2unicode(ci.device_name).c_str());
     }
     ((CComboBox *)GetDlgItem(IDC_COMBO_CAMERA))->SetCurSel(0);
 
     // 初始化屏幕窗口列表
-    int screen_count = _rtc_video_interface->GetScreenWindowCount();
+    int screen_count = _rtc_client_ptr->GetScreenWindowCount();
     for (int i(0); i < screen_count; ++i) {
-        qiniu_v2::ScreenWindowInfo sw = _rtc_video_interface->GetScreenWindowInfo(i);
+        qiniu::QNScreenWindowInfo sw = _rtc_client_ptr->GetScreenWindowInfo(i);
         _screen_info_map[sw.id] = sw;
         ((CComboBox *)GetDlgItem(IDC_COMBO_SCREEN))->InsertString(-1, utf2unicode(sw.title).c_str());
     }
     ((CComboBox *)GetDlgItem(IDC_COMBO_SCREEN))->SetCurSel(0);
 
     // 初始化音频采集设备列表
-    int audio_rec_count = _rtc_audio_interface->GetAudioDeviceCount(qiniu_v2::AudioDeviceInfo::adt_record);
+    int audio_rec_count = _rtc_client_ptr->GetAudioDeviceCount(qiniu::QNAudioDeviceInfo::adt_record);
     for (int i(0); i < audio_rec_count; ++i) {
-        qiniu_v2::AudioDeviceInfo audio_info;
-        if (_rtc_audio_interface->GetAudioDeviceInfo(qiniu_v2::AudioDeviceInfo::adt_record, i, audio_info) == 0) {
-            ((CComboBox *)GetDlgItem(IDC_COMBO_MICROPHONE))->InsertString(
-                -1,
-                utf2unicode(audio_info.device_name).c_str()
-            );
-            if (audio_info.is_default) {
-                qiniu_v2::AudioDeviceSetting ads;
-                ads.device_index = audio_info.device_index;
-                ads.device_type = qiniu_v2::AudioDeviceSetting::wdt_DefaultDevice;
-                _rtc_audio_interface->SetRecordingDevice(ads);
-            }
-            _microphone_dev_map[i] = audio_info;
+        qiniu::QNAudioDeviceInfo audio_info;
+        _rtc_client_ptr->GetAudioDeviceInfo(qiniu::QNAudioDeviceInfo::adt_record, i, audio_info);
+        ((CComboBox *)GetDlgItem(IDC_COMBO_MICROPHONE))->InsertString(
+            -1,
+            utf2unicode(audio_info.device_name).c_str()
+        );
+        if (audio_info.is_default) {
+            qiniu::QNAudioDeviceSetting ads;
+            ads.device_index = audio_info.device_index;
+            ads.device_type = qiniu::QNAudioDeviceSetting::wdt_DefaultDevice;
+            _rtc_client_ptr->SetRecordingDevice(ads);
         }
+        _microphone_dev_map[i] = audio_info;
     }
     ((CComboBox *)GetDlgItem(IDC_COMBO_MICROPHONE))->SetCurSel(0);
 
     // 初始化音频播放设备列表
-    int audio_play_count = _rtc_audio_interface->GetAudioDeviceCount(qiniu_v2::AudioDeviceInfo::adt_playout);
+    int audio_play_count = _rtc_client_ptr->GetAudioDeviceCount(qiniu::QNAudioDeviceInfo::adt_playout);
     for (int i(0); i < audio_play_count; ++i) {
-        qiniu_v2::AudioDeviceInfo audio_info;
-        if (_rtc_audio_interface->GetAudioDeviceInfo(qiniu_v2::AudioDeviceInfo::adt_playout, i, audio_info) == 0) {
-            ((CComboBox *)GetDlgItem(IDC_COMBO_PLAYOUT))->InsertString(
-                -1,
-                utf2unicode(audio_info.device_name).c_str()
-            );
-            if (audio_info.is_default) {
-                qiniu_v2::AudioDeviceSetting ads;
-                ads.device_index = audio_info.device_index;
-                ads.device_type = qiniu_v2::AudioDeviceSetting::wdt_DefaultDevice;
-                _rtc_audio_interface->SetPlayoutDevice(ads);
-            }
-            _playout_dev_map[i] = audio_info;
+        qiniu::QNAudioDeviceInfo audio_info;
+        _rtc_client_ptr->GetAudioDeviceInfo(qiniu::QNAudioDeviceInfo::adt_playout, i, audio_info);
+        ((CComboBox *)GetDlgItem(IDC_COMBO_PLAYOUT))->InsertString(
+            -1,
+            utf2unicode(audio_info.device_name).c_str()
+        );
+        if (audio_info.is_default) {
+            qiniu::QNAudioDeviceSetting ads;
+            ads.device_index = audio_info.device_index;
+            ads.device_type = qiniu::QNAudioDeviceSetting::wdt_DefaultDevice;
+            _rtc_client_ptr->SetPlayoutDevice(ads);
         }
+        _playout_dev_map[i] = audio_info;
     }
     ((CComboBox *)GetDlgItem(IDC_COMBO_PLAYOUT))->SetCurSel(0);
 
@@ -379,7 +383,7 @@ void CRtcDemoV2::InitUI()
     ((CButton*)GetDlgItem(IDC_CHECK_IMPORT_RAW_DATA))->SetCheck(0);
 }
 
-std::tuple<int, int> CRtcDemoV2::FindBestVideoSize(const qiniu_v2::CameraCapabilityVec& camera_cap_vec_)
+std::tuple<int, int> CRtcDemoV2::FindBestVideoSize(const qiniu::CameraCapabilityVec& camera_cap_vec_)
 {
     if (camera_cap_vec_.empty()) {
         return{ 0,0 };
@@ -402,687 +406,212 @@ std::tuple<int, int> CRtcDemoV2::FindBestVideoSize(const qiniu_v2::CameraCapabil
     return std::make_tuple(dest_width, dest_height);
 }
 
-/**
- * 关于错误异常的相关处理，都应在相应的回调中完成; 需要处理的错误码及建议处理逻辑如下:
- *
- *【TOKEN相关】
- * 1. Err_Token_Error 表示您提供的房间 token 不符合七牛 token 签算规则,
- *    详情请参考【服务端开发说明 RoomToken 签发服务】 https://doc.qnsdk.com/rtn/docs/server_overview#1，
- *    在 OnJoinResult 回调中暴露；
- * 2. Err_Token_Expired 表示您的房间 token 过期, 需要重新生成 token 再加入，在 OnJoinResult 回调中暴露；
- * 3. Err_ReconnToken_Error 表示你重新进入房间 token 错误，需要注意网络质量，请务必调用 LeaveRoom 后重新进入，
- *    在 OnJoinResult 回调中暴露；
- *
- *【房间设置相关】以下情况可以与您的业务服务开发确认具体设置
- * 1. Err_Room_Full 当房间已加入人数超过每个房间的人数限制触发，请确认后台服务的设置，在 OnJoinResult 回调中暴露；
- * 2. Err_User_Already_Exist 后台如果配置为开启【禁止自动踢人】,则同一用户重复加入/未
- *    正常退出再加入会触发此错误,您的业务可根据实际情况选择配置，在 OnJoinResult 回调中暴露；
- * 3. Err_No_Permission 用户对于特定操作，如合流需要配置权限，禁止出现未授权的用户操作，在 OnKickoutResult 回调中暴露；
- * 4. Err_Room_Closed 房间已被管理员关闭，在 OnJoinResult 回调中暴露；
- * 5. Err_User_Not_Exist 用户不存在，这里要注意被踢用户是否在房间内，在 OnKickoutResult 回调中暴露；
- *
- *【其他错误】
- * 1. Err_Invalid_Parameter 服务交互参数错误，请注意信令参数设置，在 OnJoinResult、OnPublishTracksResult、OnKickoutResult 回调中暴露；
- * 2. Err_Multi_Master_AV 请确定对于音频/视频 Track，分别最多只能有一路为 master，在 OnPublishTracksResult 回调中暴露；
- */
-
-void CRtcDemoV2::OnJoinResult(
-    int error_code_,
-    const string& error_str_,
-    const qiniu_v2::UserInfoList& user_vec_,
-    const qiniu_v2::TrackInfoList& tracks_vec_,
-    bool reconnect_flag_)
+void CRtcDemoV2::OnLocalAudioPCMFrame(
+    const unsigned char* data,
+    int bitsPerSample,
+    int sampleRrate,
+    size_t channels,
+    size_t samplePoints)
 {
-    wchar_t buff[1024] = { 0 };
-    GetDlgItem(IDC_BUTTON_LOGIN)->EnableWindow(TRUE);
+}
 
-    _start_tp = chrono::steady_clock::now();
-    if (0 == error_code_) {
+void CRtcDemoV2::OnLocalVideoFrame(
+    const string& trackId,
+    const unsigned char* data,
+    int dataSize,
+    int width,
+    int height,
+    qiniu::QNVideoSourceType videoType)
+{
+}
+
+void CRtcDemoV2::OnRemoteAudioFrame(
+    const string& userId,
+    const unsigned char* data,
+    int bitsPerSample,
+    int sampleRrate,
+    size_t channels,
+    size_t samplePoints)
+{
+}
+
+
+void CRtcDemoV2::OnRemoteVideoFrame(
+    const std::string& userId,
+    const string& trackId,
+    const unsigned char* data,
+    int dataSize,
+    int width,
+    int height,
+    qiniu::QNVideoSourceType videoType)
+{
+}
+
+void CRtcDemoV2::OnPreviewVideoFrame(
+    const unsigned char* data,
+    int dataSize,
+    int width,
+    int height,
+    QNVideoSourceType videoType)
+{
+}
+
+void CRtcDemoV2::OnRemoteMixAudioPCMFrame(
+    const unsigned char* data,
+    int bitsPerSample,
+    int sampleRrate,
+    size_t channels,
+    size_t samplePoints)
+{
+}
+
+void CRtcDemoV2::OnVideoProfileChanged(const std::string& trackid, qiniu::QNTrackProfile profile)
+{
+    if (profile == qiniu::HIGH) {
+        ((CComboBox*)GetDlgItem(IDC_COMBO_SUBSCRIBE_PROFILE))->SetCurSel(0);
+    } else if (profile == qiniu::MEDIUM) {
+        ((CComboBox*)GetDlgItem(IDC_COMBO_SUBSCRIBE_PROFILE))->SetCurSel(1);
+    } else if (profile == qiniu::LOW) {
+        ((CComboBox*)GetDlgItem(IDC_COMBO_SUBSCRIBE_PROFILE))->SetCurSel(2);
+    }
+}
+
+void CRtcDemoV2::OnVideoDeviceStateChanged(qiniu::QNVideoDeviceState deviceState, const std::string& deviceName)
+{
+    thread(
+        [&, deviceState, deviceName] {
+        wchar_t buf[512] = { 0 };
+        if (qiniu::vds_lost == deviceState) {
+            _snwprintf(
+                buf,
+                512,
+                _T("视频设备：%s 被拔出！"),
+                utf2unicode(deviceName).c_str()
+            );
+            AfxMessageBox(buf, MB_OK);
+        }
+    }
+    ).detach();
+}
+
+void CRtcDemoV2::OnAudioDeviceStateChanged(qiniu::QNAudioDeviceState deviceState, const std::string& deviceGuid)
+{
+    thread(
+        [&, deviceState, deviceGuid] {
+        wchar_t buf[512] = { 0 };
+        if (qiniu::ads_active != deviceState) {
+            _snwprintf(
+                buf,
+                512,
+                _T("音频设备：%s 被拔出！"),
+                utf2unicode(deviceGuid).c_str()
+            );
+            AfxMessageBox(buf, MB_OK);
+        }
+    }
+    ).detach();
+}
+
+void CRtcDemoV2::OnPublished()
+{
+    _local_published_track_list = _rtc_client_ptr->GetPublishedTracks();
+    for (auto&& itor : _local_published_track_list) {
+        if (itor->GetSourceType() == tst_ExternalYUV) {
+            if (_custom_video_track_ptr && (_custom_video_track_ptr->GetTrackID().compare("") != 0)) {
+                if (_stop_video_external_flag) {
+                    ImportExternalVideoRawFrame();
+                    _custom_video_track_ptr->SetVideoFrameListener(this);
+                }
+            }
+        }
+        if (itor->GetSourceType() == tst_ExternalPCM) {
+            if (_custom_audio_track_ptr && (_custom_audio_track_ptr->GetTrackID().compare("") != 0)) {
+                if (_stop_audio_external_flag) {
+                    ImportExternalAudioRawFrame();
+                }
+                _custom_audio_track_ptr->SetAudioFrameListener(this);
+            }
+        }
+
+        if (_camera_track_ptr && (_camera_track_ptr->GetTrackID().compare("") != 0)) {
+            _camera_track_ptr->SetVideoFrameListener(this);
+        }
+
+        if (_screen_track_ptr && (_screen_track_ptr->GetTrackID().compare("") != 0)) {
+            _screen_track_ptr->SetVideoFrameListener(this);
+        }
+
+        if (_microphone_audio_track_ptr && (_microphone_audio_track_ptr->GetTrackID().compare("") != 0)) {
+            _microphone_audio_track_ptr->SetAudioFrameListener(this);
+        }
+    }
+}
+
+void CRtcDemoV2::OnPublishError(int errorCode, const std::string& errorMessage)
+{
+}
+
+void CRtcDemoV2::OnConnectionStateChanged(qiniu::QNConnectionState state, const qiniu::QNConnectionDisconnectedInfo& info)
+{
+    if (state == CONNECTED) {
+        GetDlgItem(IDC_BUTTON_LOGIN)->EnableWindow(TRUE);
+        GetDlgItem(IDC_BUTTON_FORWARD)->EnableWindow(TRUE);
         _wnd_status_bar.SetText(_T("登录成功！"), 1, 0);
         SetDlgItemText(IDC_BUTTON_LOGIN, _T("离开"));
-        GetDlgItem(IDC_BUTTON_SIMULCAST)->EnableWindow(FALSE);
-        GetDlgItem(IDC_BUTTON_FORWARD)->EnableWindow(TRUE);
-        GetDlgItem(IDC_BUTTON_EXTRA_DATA)->EnableWindow(FALSE);
-        lock_guard<recursive_mutex> lck(_mutex);
-        _user_list.clear();
-        _user_list_ctrl.DeleteAllItems();
-        for each (qiniu_v2::UserInfo itor in user_vec_)
-        {
-            _user_list_ctrl.InsertItem(0, utf2unicode(itor.user_id).c_str());
-            _user_list_ctrl.SetItemText(0, 0, utf2unicode(itor.user_id).c_str());
 
-            _user_list.push_back(itor.user_id);
-        }
-
-        _local_tracks_list.clear();
-        _remote_tracks_map.clear();
-        qiniu_v2::TrackInfoList sub_tracks_list;
-
-        for (auto&& itor : tracks_vec_) {
-            if (itor->GetUserId().compare(unicode2utf(_user_id.GetBuffer())) == 0) {
-                continue;
-            }
-            TRACE("%s", itor->GetKind());
-            auto tmp_track_ptr = qiniu_v2::QNTrackInfo::Copy(itor);
-            // 自动订阅
-            shared_ptr<TrackInfoUI> tiu(new TrackInfoUI(this, tmp_track_ptr));
-            if (tiu->render_wnd_ptr) {
-                tmp_track_ptr->SetRenderHwnd((void*)tiu->render_wnd_ptr->m_hWnd);
-            }
-            // 默认订阅的 profile 为 HIGH 
-            if (tmp_track_ptr->GetKind().compare("video") == 0) {
-                for (auto&& layeritor : tmp_track_ptr->GetLayerInfo())
-                {
-                    if (layeritor.mProfile == qiniu_v2::HIGH) {
-                        layeritor.mChooseToSub = true;
-                    }
-                }
-            }
-            _remote_tracks_map.insert_or_assign(tmp_track_ptr->GetTrackId(), tiu);
-            sub_tracks_list.emplace_back(tmp_track_ptr);
-            itor->Release();
-        }
-        if (!sub_tracks_list.empty()) {
-            _rtc_room_interface->SubscribeTracks(sub_tracks_list);
-            // 调整订阅窗口的布局
-            AdjustSubscribeLayouts();
-        }
-
+        _start_tp = chrono::steady_clock::now();
         SetTimer(UPDATE_TIME_DURATION_TIMER, 100, nullptr);
-
-        // 主动配置当前音频设备，也可以不调用，则 SDK 使用系统默认设备
-        OnCbnSelchangeComboMicrophone();
-        OnCbnSelchangeComboPlayout();
-
-        if (!reconnect_flag_) {
-            // 自动开始发布
-            StartPublish();
+        StartPublish();
+    } else if (state == DISCONNECTED) {
+        if (info.reason == QNConnectionDisconnectedInfo::KICKED_OUT) {
+            _wnd_status_bar.SetText(_T("被踢出！"), 1, 0);
+        } else if (info.reason == QNConnectionDisconnectedInfo::ROOM_ERROR) {
+            SetDlgItemText(IDC_BUTTON_LOGIN, _T("登录"));
+            Leave();
+            PostMessage(WM_COMMAND, MAKEWPARAM(IDC_BUTTON_LOGIN, BN_CLICKED), NULL);
         }
-        _msg_rich_edit_ctrl.SetWindowTextW(_T(""));
-        _msg_rich_edit_ctrl.UpdateData();
-        _msg_rich_edit_ctrl.Invalidate();
-
-        if (1 == ((CButton*)GetDlgItem(IDC_CHECK_MERGE))->GetCheck()) {
-            CreateCustomMergeJob();
-        }
-        GetDlgItem(IDC_BUTTON_SEND_MSG)->EnableWindow(TRUE);
-        GetDlgItem(IDC_COMBO_LOCAL_ROTATION)->EnableWindow(TRUE);
-
-    } else {
-        switch (error_code_) {
-        case Err_Token_Error:
-            _snwprintf(buff, 1024, _T("登录失败，error code:%d, error msg:%s"),
-                error_code_, utf2unicode("RoomToken 错误,请检查后从新生成再加入房间").c_str());
-            break;
-        case Err_Token_Expired:
-            _snwprintf(buff, 1024, _T("登录失败，error code:%d, error msg:%s"),
-                error_code_, utf2unicode("roomToken 过期").c_str());
-            break;
-        case Err_Room_Closed:
-            _snwprintf(buff, 1024, _T("登录失败，error code:%d, error msg:%s"),
-                error_code_, utf2unicode("房间已被管理员关闭").c_str());
-            break;
-        case Err_Room_Full:
-            _snwprintf(buff, 1024, _T("登录失败，error code:%d, error msg:%s"),
-                error_code_, utf2unicode("房间人数已满").c_str());
-            break;
-        case Err_User_Already_Exist:
-            _snwprintf(buff, 1024, _T("登录失败，error code:%d, error msg:%s"),
-                error_code_, utf2unicode("不允许同一用户重复进入").c_str());
-            break;
-        case Err_ReconnToken_Error:
-            _snwprintf(buff, 1024, _T("登录失败，error code:%d, error msg:%s"),
-                error_code_, utf2unicode("重新进入房间超时，请重新获取roomtoken后进入房间").c_str());
-            break;
-        case Err_Room_Not_Exist:
-            _snwprintf(buff, 1024, _T("登录失败，error code:%d, error msg:%s"),
-                error_code_, utf2unicode("房间不存在，请先确认房间是否已创建").c_str());
-            break;
-        case Err_Invalid_Parameter:
-            _snwprintf(buff, 1024, _T("登录失败，error code:%d, error msg:%s"),
-                error_code_, utf2unicode("服务交互参数错误").c_str());
-            break;
-        default:
-            break;
-        }
-        GetDlgItem(IDC_BUTTON_FORWARD)->EnableWindow(FALSE);
-        _wnd_status_bar.SetText(buff, 1, 0);
-        SetDlgItemText(IDC_BUTTON_LOGIN, _T("登录"));
-        // ReJoin，demo 这边针对异常做了重新连接功能，
-        // 客户可以根据自己需要做相应的异常处理或者重新连接功能。
-        PostMessage(WM_COMMAND, MAKEWPARAM(IDC_BUTTON_LOGIN, BN_CLICKED), NULL);
     }
 }
 
-void CRtcDemoV2::OnLeave(int error_code_, const string& error_str_, const string& user_id_)
-{
-    // 用户被踢、同一用户名登录同一房间或者 closeroom 会触发此消息，
-    // client 收到这个消息需主动断开连接，且不要去重连
-    wchar_t buff[1024] = { 0 };
-    _snwprintf(
-        buff, 
-        1024, 
-        _T("您以非正常方式离开了房间：error code:%d, error msg:%s, kickout user:%s"), 
-        error_code_, 
-        utf2unicode(error_str_).c_str(),
-        utf2unicode(user_id_).c_str()
-    );
-    _wnd_status_bar.SetText(buff, 1, 0);
-    CString msg_str(buff);
-
-    thread([&, msg_str] {
-        MessageBox(msg_str);
-    }).detach();
-    
-    KillTimer(UPDATE_TIME_DURATION_TIMER);
-    Invalidate();
-
-    // 发送消息离开房间，并释放 SDK 资源
-    PostMessage(WM_COMMAND, MAKEWPARAM(IDC_BUTTON_LOGIN, BN_CLICKED), NULL);
-}
-
-void CRtcDemoV2::OnRoomStateChange(qiniu_v2::RoomState state_)
-{
-    if (state_ == qiniu_v2::RoomState::rs_reconnecting) {
-        _wnd_status_bar.SetText(_T("网络断开，自动重连中，请检查您的网络！"), 1, 0);
-    }
-}
-
-void CRtcDemoV2::OnPublishTracksResult(int error_code_, 
-    const string& error_str_, const qiniu_v2::TrackInfoList& track_info_list_)
+void CRtcDemoV2::OnUserJoined(const std::string& remoteUserID, const std::string& userData)
 {
     lock_guard<recursive_mutex> lck(_mutex);
-    wchar_t buff[1024] = { 0 };
-    for (auto&& itor : track_info_list_) {
-        // 还原控件状态 
-        if (itor->GetTag().compare(CAMERA_TAG) == 0) {
-            GetDlgItem(IDC_CHECK_CAMERA)->EnableWindow(TRUE);
-        } else if (itor->GetTag().compare(MICROPHONE_TAG) == 0) {
-            GetDlgItem(IDC_CHECK_AUDIO)->EnableWindow(TRUE);
-        } else if (itor->GetTag().compare(SCREENCASTS_TAG) == 0) {
-            GetDlgItem(IDC_CHECK_SCREEN)->EnableWindow(TRUE);
-        } else if (itor->GetTag().compare(EXTERNAL_TAG) == 0) {
-            GetDlgItem(IDC_CHECK_IMPORT_RAW_DATA)->EnableWindow(TRUE);
-        }
-
-        if (itor->GetTrackId().empty()) {
-            // 此 Track 发布失败
-            _snwprintf(buff, 1024, _T("本地流发布失败，Tag：%d"), utf2unicode(itor->GetTag()));
-            _wnd_status_bar.SetText(buff, 1, 0);
-            continue;
-        }
-        _local_tracks_list.emplace_back(qiniu_v2::QNTrackInfo::Copy(itor));
-        if (itor->GetSourceType() == qiniu_v2::tst_ExternalYUV) {
-            ImportExternalRawFrame(itor->GetTrackId());
-        }
-    }
-    if (0 == error_code_) {
-        _snwprintf(buff, 1024, _T("本地流发布成功，流数量：%d"), track_info_list_.size());
-    } else {
-        switch (error_code_) {
-        case Err_Invalid_Parameter:
-            _snwprintf(buff, 1024, _T("本地流发布失败，error code:%d, error msg:%s"),
-                error_code_, utf2unicode("服务交互参数错误").c_str());
-            break;
-        case Err_Multi_Master_AV:
-            _snwprintf(buff, 1024, _T("本地流发布失败，error code:%d, error msg:%s"),
-                error_code_, utf2unicode("请查看是否加入房间，并确定对于音频/视频 Track，分别只能有一路为 master").c_str());
-            break;
-        default:
-            break;
-        }
-    }
-    // 释放 SDK 内部资源
-    for (auto&& itor : track_info_list_)
-    {
-        itor->Release();
-    }
-    _wnd_status_bar.SetText(buff, 1, 0);
-    AdjustMergeStreamLayouts();
-}
-
-void CRtcDemoV2::OnUnPublishTracksResult(const qiniu_v2::TrackInfoList& track_list_)
-{
-    // 释放 SDK 内部资源
-    for (auto&& itor : track_list_){
-        itor->Release();
-    }
-}
-
-void CRtcDemoV2::OnRemoteStatisticsUpdated(const qiniu_v2::StatisticsReportList& statistics_list_)
-{
-    // 远端上行网络质量
-    wchar_t dest_buf[1024] = { 0 };
-    for (auto&& itor : statistics_list_){
-        if (itor.is_video) {
-            _snwprintf(dest_buf,
-                sizeof(dest_buf),
-                _T("[远端上行视频]-用户:%s,Track Id:%s,rtt:%I64d,丢包率:%0.1f"),
-                utf2unicode(itor.user_id).c_str(),
-                utf2unicode(itor.track_id).c_str(),
-                itor.out_rtt,
-                itor.video_packet_lost_rate * 100
-            );
-        } else {
-            _snwprintf(dest_buf,
-                sizeof(dest_buf),
-                _T("[远端上行音频]-用户:%s,Track Id:%s,rtt:%I64d,丢包率:%0.1f"),
-                utf2unicode(itor.user_id).c_str(),
-                utf2unicode(itor.track_id).c_str(),
-                itor.out_rtt,
-                itor.audio_packet_lost_rate * 100
-            );
-        }
-
-        TRACE(dest_buf);
-
-        int line_count = _msg_rich_edit_ctrl.GetLineCount();
-        if (line_count >= 1000) {
-            // 此控件可存储数据量有限，为避免卡顿，及时清除
-            _msg_rich_edit_ctrl.SetWindowTextW(_T(""));
-            _msg_rich_edit_ctrl.UpdateData();
-            _msg_rich_edit_ctrl.Invalidate();
-        }
-        _msg_rich_edit_ctrl.SetSel(-1, -1);
-        _msg_rich_edit_ctrl.ReplaceSel(_T("\n"));
-        _msg_rich_edit_ctrl.ReplaceSel(dest_buf);
-        _msg_rich_edit_ctrl.PostMessage(WM_VSCROLL, SB_BOTTOM, 0);
-    }
-}
-
-
-void CRtcDemoV2::OnCreateMergeResult(
-    const std::string& job_id_,
-    int error_code_,
-    const std::string& error_str_)
-{
-    wchar_t buff[1024] = { 0 };
-    if (error_code_ != 0) {
-        switch (error_code_) {
-        case Err_No_Permission:
-            _snwprintf(buff, 1024, _T("合流失败，error code:%d, error msg:%s"),
-                error_code_, utf2unicode("请检查用户是否有合流权限").c_str());
-            break;
-        case Err_Invalid_Parameter:
-            _snwprintf(buff, 1024, _T("合流失败，error code:%d, error msg:%s"),
-                error_code_, utf2unicode("服务交互参数错误").c_str());
-            break;
-        default:
-            break;
-        }
-        _wnd_status_bar.SetText(buff, 1, 0);
-    }
-    else {
-        _snwprintf(buff, 1024, _T("合流成功"));
-        if (_contain_forward_flag) {
-            // 如果是单路转推切合流任务，在合流成功之后停止单路转推 
-            _rtc_room_interface->StopForwardJob(_custom_forward_id, 0);
-        }
-    }
-}
-
-void CRtcDemoV2::OnStopMergeResult(
-    const std::string& job_id_,
-    const std::string& job_iid_,
-    int error_code_,
-    const std::string& error_str_)
-{
-    wchar_t buff[1024] = { 0 };
-    if (error_code_ != 0) {
-        switch (error_code_) {
-        case Err_No_Permission:
-            _snwprintf(buff, 1024, _T("合流停止失败，error code:%d, error msg:%s"),
-                error_code_, utf2unicode("请检查用户是否有合流权限").c_str());
-            break;
-        case Err_Invalid_Parameter:
-            _snwprintf(buff, 1024, _T("合流停止失败，error code:%d, error msg:%s"),
-                error_code_, utf2unicode("服务交互参数错误").c_str());
-            break;
-        default:
-            break;
-        }
-        _wnd_status_bar.SetText(buff, 1, 0);
-    }
-    else {
-        _snwprintf(buff, 1024, _T("合流停止成功"));
-    }
-}
-
-void CRtcDemoV2::OnSetSubscribeTracksProfileResult(
-    int error_code_,
-    const string& error_str_,
-    const qiniu_v2::TrackInfoList& track_list_
-)
-{
-    // 切换 profile 后，将对应的生效状态 mActive 置为 true。
-    for (auto&& itor : track_list_)
-    {
-        auto tmp_itor = _remote_tracks_map.find(itor->GetTrackId());
-        if (tmp_itor == _remote_tracks_map.end()) {
-            continue;
-        }
-
-        if (tmp_itor->second->track_info_ptr->GetKind().compare(VIDEO_KIND_TYPE) == 0) {
-            for (auto&& layer_itor : itor->GetLayerInfo())
-            {
-                if (layer_itor.mActive) {
-                    for (auto&& cur_itor : tmp_itor->second->track_info_ptr->GetLayerInfo()) {
-                        if (layer_itor.mProfile == cur_itor.mProfile) {
-                            cur_itor.mActive = true;
-                            if (cur_itor.mProfile == qiniu_v2::HIGH) {
-                                ((CComboBox*)GetDlgItem(IDC_COMBO_SUBSCRIBE_PROFILE))->SetCurSel(0);
-                            } else if (cur_itor.mProfile == qiniu_v2::MEDIUM) {
-                                ((CComboBox*)GetDlgItem(IDC_COMBO_SUBSCRIBE_PROFILE))->SetCurSel(1);
-                            } else if (cur_itor.mProfile == qiniu_v2::LOW) {
-                                ((CComboBox*)GetDlgItem(IDC_COMBO_SUBSCRIBE_PROFILE))->SetCurSel(2);
-                            }
-                        } else {
-                            cur_itor.mActive = false;
-                        }
-                        cur_itor.mChooseToSub = false;
-                    }
-                }
-
-            }
-        }
-    }
-
-    for (auto&& itor : track_list_) {
-        itor->Release();
-    }
-}
-
-void CRtcDemoV2::OnCreateForwardResult(
-    const std::string& job_id_,
-    int error_code_,
-    const std::string& error_str_)
-{
-    wchar_t buff[1024] = { 0 };
-    if (error_code_ != 0) {
-        switch (error_code_) {
-        case Err_No_Permission:
-            _snwprintf(buff, 1024, _T("单路转推失败，error code:%d, error msg:%s"),
-                error_code_, utf2unicode("请检查用户是否有转推权限").c_str());
-            break;
-        case Err_Invalid_Parameter:
-            _snwprintf(buff, 1024, _T("单路转推失败，error code:%d, error msg:%s"),
-                error_code_, utf2unicode("服务交互参数错误").c_str());
-            break;
-        default:
-            break;
-        }
-        _wnd_status_bar.SetText(buff, 1, 0);
-    } else {
-        _snwprintf(buff, 1024, _T("单路转推成功"));
-        // 如果是合流切单路转推任务，在单路转推成功之后停止单路转推 
-        if (_contain_admin_flag) {
-            _rtc_room_interface->StopMergeStream(string(), 0);
-        }
-        if (1 == ((CButton*)GetDlgItem(IDC_CHECK_MERGE))->GetCheck()) {
-            _rtc_room_interface->StopMergeStream(_custom_merge_id, 0);
-        }
-    }
-}
-
-void CRtcDemoV2::OnStopForwardResult(
-    const std::string& job_id_,
-    const std::string& job_iid_,
-    int error_code_,
-    const std::string& error_str_)
-{
-    wchar_t buff[1024] = { 0 };
-    if (error_code_ != 0) {
-        switch (error_code_) {
-        case Err_No_Permission:
-            _snwprintf(buff, 1024, _T("单路转推停止失败，error code:%d, error msg:%s"),
-                error_code_, utf2unicode("请检查用户是否有转推权限").c_str());
-            break;
-        case Err_Invalid_Parameter:
-            _snwprintf(buff, 1024, _T("单路转推停止失败，error code:%d, error msg:%s"),
-                error_code_, utf2unicode("服务交互参数错误").c_str());
-            break;
-        default:
-            break;
-        }
-        _wnd_status_bar.SetText(buff, 1, 0);
-    } else {
-        _snwprintf(buff, 1024, _T("单路转推停止成功"));
-    }
-}
-
-void CRtcDemoV2::OnRemoteUserReconnecting(const std::string& remote_user_id_)
-{
-
-    wchar_t buf[512] = { 0 };
-    _snwprintf(buf,
-        sizeof(buf),
-        _T("%s 用户正在重连"),
-        utf2unicode(remote_user_id_).c_str()
-    );
-    _wnd_status_bar.SetText(buf, 1, 0);
-}
-
-void CRtcDemoV2::OnRemoteUserReconnected(const std::string& remote_user_id_)
-{
-
-    wchar_t buf[512] = { 0 };
-    _snwprintf(buf,
-        sizeof(buf),
-        _T("%s 用户重连成功"),
-        utf2unicode(remote_user_id_).c_str()
-    );
-    _wnd_status_bar.SetText(buf, 1, 0);
-}
-
-void CRtcDemoV2::OnTrackMute(bool server_mute_flag_, bool local_mute_flag_, qiniu_v2::QNTrackInfo& trackInfo_)
-{
-    wchar_t buff[1024] = { 0 };
-    _snwprintf(
-        buff,
-        1024,
-        _T("server flag : %d, local flag : %d, mute : %d, Track Id : %s"),
-        server_mute_flag_,
-        local_mute_flag_,
-        trackInfo_.IsMuted(),
-        utf2unicode(trackInfo_.GetTrackId()).c_str()
-    );
-    _wnd_status_bar.SetText(buff, 1, 0);
-}
-
-void CRtcDemoV2::OnSubscribeTracksResult(int error_code_, 
-    const std::string &error_str_, const qiniu_v2::TrackInfoList &track_info_list_)
-{
-    wchar_t buff[1024] = { 0 };
-    int succ_num(0), failed_num(0);
-    // 依次判断订阅结果
-    // 将订阅的 profile 所对应的生效状态 mActive 置为 true。
-    for (auto&& itor : track_info_list_)
-    {
-        if (itor->IsConnected()) {
-            _rtc_video_interface->SetStretchMode(itor->GetTrackId(), qiniu_v2::ASPECT_FILL);
-            auto tmp_itor = _remote_tracks_map.find(itor->GetTrackId());
-            if (tmp_itor == _remote_tracks_map.end()) {
-                continue;
-            }
-
-            if (tmp_itor->second->track_info_ptr->GetKind().compare(VIDEO_KIND_TYPE) == 0) {
-                for (auto&& layer_itor : itor->GetLayerInfo())
-                {
-                    if (layer_itor.mActive) {
-                        for (auto&& cur_itor : tmp_itor->second->track_info_ptr->GetLayerInfo()) {
-                            if (layer_itor.mProfile == cur_itor.mProfile) {
-                                cur_itor.mActive = true;  //当前订阅的远端 track 的 profile 对应生效状态置为 true 
-                            } else {
-                                cur_itor.mActive = false;
-                            }
-                            cur_itor.mChooseToSub = false;
-                        }
-                    }
-
-                }
-            }
-
-            ++succ_num;
-            TRACE(
-                _T("订阅成功， User Id:%s, track Id：%s, Kind:%s, tag:%s\n"),
-                utf2unicode(itor->GetUserId()).c_str(),
-                utf2unicode(itor->GetTrackId()).c_str(),
-                utf2unicode(itor->GetKind()).c_str(),
-                utf2unicode(itor->GetTag()).c_str()
-            );
-        } else {
-            ++failed_num;
-            // 释放已分配的资源（渲染窗口等）
-            auto itor_ui = _remote_tracks_map.find(itor->GetTrackId());
-            if (itor_ui != _remote_tracks_map.end()) {
-                _remote_tracks_map.erase(itor_ui);
-            }
-            TRACE(
-                _T("订阅失败， User Id:%s, track Id：%s, Kind:%s, tag:%s\n"), 
-                utf2unicode(itor->GetUserId()).c_str(),
-                utf2unicode(itor->GetTrackId()).c_str(),
-                utf2unicode(itor->GetKind()).c_str(),
-                utf2unicode(itor->GetTag()).c_str()
-                );
-        }
-    }
-    if (0 == error_code_) {
-        GetDlgItem(IDC_COMBO_REMOTE_ROTATION)->EnableWindow(TRUE);
-        _snwprintf(
-            buff, 
-            1024, 
-            _T("数据流订阅成功数量：%d，失败数量：%d"), 
-            succ_num,
-            failed_num
-        );
-    } else {
-        _snwprintf(
-            buff,
-            1024,
-            _T("数据流订阅失败, error code：%d，error msg:%s"),
-            error_code_,
-            utf2unicode(error_str_).c_str()
-        );
-    }
-    _wnd_status_bar.SetText(buff, 1, 0);
-    
-    AdjustMergeStreamLayouts();
-
-    for (auto&& itor : track_info_list_) {
-        itor->Release();
-    }
-}
-
-void CRtcDemoV2::OnRemoteAddTracks(const qiniu_v2::TrackInfoList& track_list_)
-{
-    ASSERT(!track_list_.empty());
-    wchar_t buff[1024] = { 0 };
-    _snwprintf(buff, 1024, _T("%s 发布了 %d 路媒体流。"), 
-        utf2unicode(track_list_.front()->GetUserId()).c_str(), track_list_.size());
-    _wnd_status_bar.SetText(buff, 1, 0);
-
-    lock_guard<recursive_mutex> lck(_mutex);
-    qiniu_v2::TrackInfoList sub_tracks_list;
-    for (auto&& itor : track_list_) {
-        TRACE("%s", itor->GetKind());
-        auto tmp_track_ptr = qiniu_v2::QNTrackInfo::Copy(itor);
-        shared_ptr<TrackInfoUI> tiu(new TrackInfoUI(this, tmp_track_ptr));
-        if (tiu->render_wnd_ptr) {
-            tmp_track_ptr->SetRenderHwnd((void*)tiu->render_wnd_ptr->m_hWnd);
-        }
-        // 默认订阅的 profile 为 HIGH 
-        if (tmp_track_ptr->GetKind().compare("video") == 0) {
-            for (auto&& layeritor : tmp_track_ptr->GetLayerInfo())
-            {
-                if (layeritor.mProfile == qiniu_v2::HIGH) {
-                    layeritor.mChooseToSub = true;
-                }
-            }
-        }
-        
-        if (tmp_track_ptr->GetKind().compare("audio") == 0) {
-            _show_extra = true;
-        }
-        _remote_tracks_map.insert_or_assign(tmp_track_ptr->GetTrackId(), tiu);
-
-        sub_tracks_list.emplace_back(tmp_track_ptr);
-    }
-    _rtc_room_interface->SubscribeTracks(sub_tracks_list);
-    // 调整订阅窗口的布局
-    AdjustSubscribeLayouts();
-
-    for (auto&& itor : track_list_) {
-        itor->Release();
-    }
-}
-
-void CRtcDemoV2::OnRemoteDeleteTracks(const list<string>& track_list_)
-{
-    wchar_t buff[1024] = { 0 };
-    _snwprintf(buff, 1024, _T("远端用户取消发布了 %d 路媒体流。"), track_list_.size());
-    _wnd_status_bar.SetText(buff, 1, 0);
-
-    // 释放本地资源
-    if (_remote_tracks_map.empty()) {
-        return;
-    }
-    lock_guard<recursive_mutex> lck(_mutex);
-    for (auto&& itor : track_list_) {
-        if (_remote_tracks_map.empty()) {
-            break;
-        }
-        auto tmp_ptr = _remote_tracks_map.begin();
-        while (tmp_ptr != _remote_tracks_map.end()) {
-            if (tmp_ptr->second->track_info_ptr->GetTrackId().compare(itor) == 0) {
-                _remote_tracks_map.erase(tmp_ptr);
-                break;
-            }
-            ++tmp_ptr;
-        }
-    }
-    AdjustSubscribeLayouts();
-}
-
-void CRtcDemoV2::OnRemoteUserJoin(const string& user_id_, const string& user_data_)
-{
-    lock_guard<recursive_mutex> lck(_mutex);
-
-    _user_list.push_back(user_id_);
+    _user_list.push_back(remoteUserID);
 
     CString str;
     for (int i = 0; i < _user_list_ctrl.GetItemCount(); i++) {
         str = _user_list_ctrl.GetItemText(i, 0);
-        if (str.CompareNoCase(utf2unicode(user_id_).c_str()) == 0) {
+        if (str.CompareNoCase(utf2unicode(remoteUserID).c_str()) == 0) {
             _user_list_ctrl.DeleteItem(i);
             break;
         }
     }
-    _user_list_ctrl.InsertItem(0, utf2unicode(user_id_).c_str());
-    _user_list_ctrl.SetItemText(0, 1, _T(""));
+    _user_list_ctrl.InsertItem(0, utf2unicode(remoteUserID).c_str());
+    _user_list_ctrl.SetItemText(0, 1, utf2unicode(userData).c_str());
 
     wchar_t buff[1024] = { 0 };
     _snwprintf(
         buff,
         1024,
         _T("%s 加入了房间！"),
-        utf2unicode(user_id_).c_str()
+        utf2unicode(remoteUserID).c_str()
     );
     _wnd_status_bar.SetText(buff, 1, 0);
 }
 
-void CRtcDemoV2::OnRemoteUserLeave(const string& user_id_, int error_code_)
+void CRtcDemoV2::OnUserLeft(const std::string& remoteUserID)
 {
     lock_guard<recursive_mutex> lck(_mutex);
     CString str;
     for (int i = 0; i < _user_list_ctrl.GetItemCount(); i++) {
         str = _user_list_ctrl.GetItemText(i, 0);
-        if (str.CompareNoCase(utf2unicode(user_id_).c_str()) == 0) {
+        if (str.CompareNoCase(utf2unicode(remoteUserID).c_str()) == 0) {
             _user_list_ctrl.DeleteItem(i);
             break;
         }
     }
 
-    auto itor = std::find(_user_list.begin(), _user_list.end(), user_id_);
+    auto itor = std::find(_user_list.begin(), _user_list.end(), remoteUserID);
     if (itor != _user_list.end()) {
         _user_list.erase(itor);
     }
@@ -1092,342 +621,172 @@ void CRtcDemoV2::OnRemoteUserLeave(const string& user_id_, int error_code_)
         buff,
         1024,
         _T("%s 离开了房间！"),
-        utf2unicode(user_id_).c_str()
+        utf2unicode(remoteUserID).c_str()
     );
     _wnd_status_bar.SetText(buff, 1, 0);
     ((CComboBox *)GetDlgItem(IDC_COMBO_REMOTE_ROTATION))->SetCurSel(0);
-    GetDlgItem(IDC_COMBO_REMOTE_ROTATION)->EnableWindow(FALSE);
 }
 
-// 踢人结果通知
-void CRtcDemoV2::OnKickoutResult(const std::string& kicked_out_user_id_, 
-    int error_code_, const std::string& error_str_)
+void CRtcDemoV2::OnUserReconnecting(const std::string& remoteUserID)
 {
-    lock_guard<recursive_mutex> lck(_mutex);
-    
-    auto itor = std::find(_user_list.begin(), _user_list.end(), kicked_out_user_id_);
-    if (itor != _user_list.end()) {
-        _user_list.erase(itor);
-    }
-
-    wchar_t buff[1024] = { 0 };
-    if (0 == error_code_) {
-        _snwprintf(
-            buff,
-            1024,
-            _T("踢出用户：%s 成功！"),
-            utf2unicode(kicked_out_user_id_).c_str()
-        );
-    } else {
-        switch (error_code_) {
-        case Err_User_Not_Exist:
-            _snwprintf(
-                buff,
-                1024,
-                _T("踢出用户：%s 失败！error code:%d, error msg:%s"),
-                utf2unicode(kicked_out_user_id_).c_str(),
-                error_code_,
-                utf2unicode("被踢用户不存在").c_str()
-            );
-            break;
-        case Err_No_Permission:
-            _snwprintf(
-                buff,
-                1024,
-                _T("踢出用户：%s 失败！error code:%d, error msg:%s"),
-                utf2unicode(kicked_out_user_id_).c_str(),
-                error_code_,
-                utf2unicode("请检查用户是否有踢人权限").c_str()
-            );
-            break;
-        case Err_Invalid_Parameter:
-            _snwprintf(
-                buff,
-                1024,
-                _T("踢出用户：%s 失败！error code:%d, error msg:%s"),
-                utf2unicode(kicked_out_user_id_).c_str(),
-                error_code_,
-                utf2unicode("服务交互参数错误").c_str()
-            );
-            break;
-        default:
-            break;
-        }
-    }
-    _wnd_status_bar.SetText(buff, 1, 0);
-}
-
-void CRtcDemoV2::OnRemoteTrackMuted(const string& track_id_, bool mute_flag_)
-{
-    wchar_t buff[1024] = { 0 };
-    _snwprintf(
-        buff,
-        1024,
-        mute_flag_ ? _T("远端用户静默了 Track Id : %s") : _T("远端用户取消了静默 Track Id : %s"),
-        utf2unicode(track_id_).c_str()
+    wchar_t buf[512] = { 0 };
+    _snwprintf(buf,
+        sizeof(buf),
+        _T("%s 用户正在重连"),
+        utf2unicode(remoteUserID).c_str()
     );
+    _wnd_status_bar.SetText(buf, 1, 0);
+}
+
+void CRtcDemoV2::OnUserReconnected(const std::string& remoteUserID)
+{
+    wchar_t buf[512] = { 0 };
+    _snwprintf(buf,
+        sizeof(buf),
+        _T("%s 用户重连成功"),
+        utf2unicode(remoteUserID).c_str()
+    );
+    _wnd_status_bar.SetText(buf, 1, 0);
+}
+
+void CRtcDemoV2::OnUserPublished(const std::string& remoteUserID, const qiniu::RemoteTrackList& trackList)
+{
+    wchar_t buff[1024] = { 0 };
+    _snwprintf(buff, 1024, _T("远端用户: %s 发布了 %d 路媒体流。"), utf2unicode(remoteUserID).c_str(), trackList.size());
     _wnd_status_bar.SetText(buff, 1, 0);
-}
 
-void CRtcDemoV2::OnStatisticsUpdated(const qiniu_v2::StatisticsReport& statistics_)
-{
-    wchar_t dest_buf[1024] = { 0 };
-    if (statistics_.is_video) {
-        if ((statistics_.user_id).compare(unicode2utf(_user_id.GetBuffer())) == 0) {
-            _snwprintf(dest_buf,
-                sizeof(dest_buf),
-                _T("[发布video]-TrackId:%s,分辨率:%d*%d,帧率:%d,码率:%d kbps,丢包率:%0.1f,媒体包数:%I64d,Fec包数:%I64d"),
-                utf2unicode(statistics_.track_id).c_str(),
-                statistics_.video_width,
-                statistics_.video_height,
-                statistics_.video_frame_rate,
-                statistics_.video_bitrate / 1024,
-                statistics_.video_packet_lost_rate * 100,
-                statistics_.video_packets_sent,
-                statistics_.video_fec_packets_sent
-            );
-        } else {
-            _snwprintf(dest_buf,
-                sizeof(dest_buf),
-                _T("[订阅video]-TrackId:%s,分辨率:%d*%d,帧率:%d,码率:%d kbps,丢包率:%0.1f,媒体包数:%I64d,Fec包数:%I64d,卡顿率:%0.1f"),
-                utf2unicode(statistics_.track_id).c_str(),
-                statistics_.video_width,
-                statistics_.video_height,
-                statistics_.video_frame_rate,
-                statistics_.video_bitrate / 1024,
-                statistics_.video_packet_lost_rate * 100,
-                statistics_.video_packets_received,
-                statistics_.video_fec_packets_received,
-                statistics_.video_total_frames_duration > 0 ? 
-                (statistics_.video_total_freezes_duration * 1.0f / statistics_.video_total_frames_duration * 100) : 0
-            );
+    for (auto&& itor : trackList) {
+        shared_ptr<TrackInfoUI> tiu(new TrackInfoUI(this, itor));
+        if (tiu->render_wnd_ptr) {
+            itor->SetRenderHwnd((void*)tiu->render_wnd_ptr->m_hWnd);
         }
-    } else {
-        if ((statistics_.user_id).compare(unicode2utf(_user_id.GetBuffer())) == 0) {
-            _snwprintf(dest_buf,
-                sizeof(dest_buf),
-                _T("[发布audio]-TrackId:%s,码率:%d kbps,丢包率:%0.1f,媒体包数:%I64d,Red包数:%I64d"),
-                utf2unicode(statistics_.track_id).c_str(),
-                statistics_.audio_bitrate / 1024,
-                statistics_.audio_packet_lost_rate * 100,
-                statistics_.audio_packets_sent,
-                statistics_.audio_red_packets_sent
-            );
-        } else {
-            _snwprintf(dest_buf,
-                sizeof(dest_buf),
-                _T("[订阅audio]-TrackId:%s,码率:%d kbps,丢包率:%0.1f,媒体包数:%I64d,卡顿率:%0.1f"),
-                utf2unicode(statistics_.track_id).c_str(),
-                statistics_.audio_bitrate / 1024,
-                statistics_.audio_packet_lost_rate * 100,
-                statistics_.audio_packets_received,
-                statistics_.total_samples_received > 0 ? 
-                (statistics_.concealed_samples * 1.0f / statistics_.total_samples_received * 100) : 0
-            );
-        }
+        _remote_tracks_map.insert_or_assign(itor->GetTrackID(), tiu);
     }
 
-    TRACE(dest_buf);
-
-    int line_count = _msg_rich_edit_ctrl.GetLineCount();
-    if (line_count >= 1000) {
-        // 此控件可存储数据量有限，为避免卡顿，及时清除
-        _msg_rich_edit_ctrl.SetWindowTextW(_T(""));
-        _msg_rich_edit_ctrl.UpdateData();
-        _msg_rich_edit_ctrl.Invalidate();
+    if (_rtc_client_ptr) {
+        _rtc_client_ptr->Subscribe(static_cast<qiniu::RemoteTrackList>(trackList));
     }
-    _msg_rich_edit_ctrl.SetSel(-1, -1);
-    _msg_rich_edit_ctrl.ReplaceSel(_T("\n"));
-    _msg_rich_edit_ctrl.ReplaceSel(dest_buf);
-    _msg_rich_edit_ctrl.PostMessage(WM_VSCROLL, SB_BOTTOM, 0);
+    AdjustSubscribeLayouts();
 }
 
-void CRtcDemoV2::OnReceiveMessage(const qiniu_v2::CustomMessageList& custom_message_)
+void CRtcDemoV2::OnUserUnpublished(const std::string& remoteUserID, const qiniu::RemoteTrackList& trackList)
 {
-    // 接收远端自定义消息
-    for (auto&& itor : custom_message_){
+    wchar_t buff[1024] = { 0 };
+    _snwprintf(buff, 1024, _T("远端用户: %s 取消发布了 %d 路媒体流。"), utf2unicode(remoteUserID).c_str(), trackList.size());
+    _wnd_status_bar.SetText(buff, 1, 0);
+
+    // 释放本地资源
+    if (_remote_tracks_map.empty()) {
+        return;
+    }
+    lock_guard<recursive_mutex> lck(_mutex);
+    for (auto&& itor : trackList) {
+        if (_remote_tracks_map.empty()) {
+            break;
+        }
+        auto tmp_ptr = _remote_tracks_map.begin();
+        while (tmp_ptr != _remote_tracks_map.end()) {
+            if (tmp_ptr->second->track_info_ptr->GetTrackID().compare(itor->GetTrackID()) == 0) {
+                _remote_tracks_map.erase(tmp_ptr);
+                break;
+            }
+            ++tmp_ptr;
+        }
+    }
+    AdjustSubscribeLayouts();
+}
+
+void CRtcDemoV2::OnSubscribed(
+    const std::string& remoteUserID,
+    const qiniu::RemoteAudioTrackList& remoteAudioTracks,
+    const qiniu::RemoteVideoTrackList& remoteVideoTracks)
+{
+    QNRemoteUser remoteUser;
+    RemoteUserList remoteList;
+    if (_rtc_client_ptr) {
+        remoteUser = _rtc_client_ptr->GetRemoteUsers(remoteUserID);
+        remoteList = _rtc_client_ptr->GetRemoteUsers();
+    }
+
+    for (auto&& itor : remoteList) {
+        for (auto && audio_itor : itor.remote_audio_tracks) {
+            audio_itor->SetAudioFrameListener(this);
+        }
+
+        for (auto && video_itor : itor.remote_video_tracks) {
+            video_itor->SetVideoFrameListener(this);
+            video_itor->SetTrackInfoChangedListener(this);
+        }
+    }
+}
+
+void CRtcDemoV2::OnMessageReceived(const qiniu::CustomMessageList& message)
+{
+    for (auto&& itor : message) {
+        if (itor.msg_text.compare("kickout") == 0) {
+            PostMessage(WM_COMMAND, MAKEWPARAM(IDC_BUTTON_LOGIN, BN_CLICKED), NULL);
+            wchar_t buff[1024] = { 0 };
+            _snwprintf(
+                buff,
+                1024,
+                _T("被 %s 用户踢出！"),
+                utf2unicode(itor.msg_sendid).c_str()
+            );
+            _wnd_status_bar.SetText(buff, 1, 0);
+            return;
+        }
         _dlg_msg.OnReceiveMessage(itor.msg_sendid, utf8_to_string(itor.msg_text));
     }
 }
 
-void CRtcDemoV2::OnAudioPCMFrame(const unsigned char* audio_data_, 
-    int bits_per_sample_, int sample_rate_, size_t number_of_channels_, 
-    size_t number_of_frames_, const std::string& user_id_)
+void CRtcDemoV2::OnMuteStateChanged(bool isMuted, const std::string& remoteUserId, const qiniu::RemoteTrackList& trackList)
 {
-    if (bits_per_sample_ / 8 == sizeof(int16_t)) {
-        // ASSERT(bits_per_sample_ / 8 == sizeof(int16_t));
-        // 可以借助以下代码计算音量的实时分贝值
-        auto level = ProcessAudioLevel(
-            (int16_t*)audio_data_,
-            bits_per_sample_ / 8 * number_of_channels_ * number_of_frames_ / sizeof(int16_t)
-        );
-    }
-}
-
-void CRtcDemoV2::OnAudioDeviceStateChanged(
-    qiniu_v2::AudioDeviceState device_state_, const std::string& device_guid_)
-{
-    thread(
-        [&, device_state_, device_guid_] {
-        wchar_t buf[512] = { 0 };
-        if (qiniu_v2::ads_active != device_state_) {
-            _snwprintf(
-                buf,
-                512,
-                _T("音频设备：%s 被拔出！"),
-                utf2unicode(device_guid_).c_str()
-            );
-            AfxMessageBox(buf, MB_OK);
+    for (auto itor : trackList) {
+        wchar_t buff[1024] = { 0 };
+        if (isMuted) {
+            _snwprintf(buff, 1024, _T("%s  开启 mute"), utf2unicode(itor->GetTrackID()).c_str());
+        } else {
+            _snwprintf(buff, 1024, _T("%s  取消 mute"), utf2unicode(itor->GetTrackID()).c_str());
         }
-    }
-    ).detach();
-}
-
-int CRtcDemoV2::OnPutExtraData(
-    unsigned char* extra_data_,
-    int extra_data_max_size_,
-    const std::string& track_id_)
-{
-    const unsigned char tmp[32] = "QNTEST";
-    memcpy(extra_data_, tmp, strlen((char*)tmp));
-    return strlen((char*)tmp);
-}
-
-int CRtcDemoV2::OnSetMaxEncryptSize(
-    int frame_size_,
-    const std::string& track_id_)
-{
-    return frame_size_ + 32;
-}
-
-int CRtcDemoV2::OnEncrypt(
-    const unsigned char* frame_,
-    int frame_size_,
-    unsigned char* encrypted_frame_,
-    const std::string& track_id_)
-{
-    // 这里加密演示是每个字节异或 0xAA，解密时也相应异或 0xAA。
-    for (size_t i = 0; i < frame_size_; i++) {
-        encrypted_frame_[i] = frame_[i] ^ 0xAA;
-    }
-    return frame_size_;
-}
-
-void CRtcDemoV2::OnGetExtraData(
-    const unsigned char* extra_data_,
-    int extra_data_size_,
-    const std::string& track_id_)
-{
-    if (_show_extra) {
-        thread(
-            [&, extra_data_] {
-            wchar_t buf[512] = { 0 };
-
-            _snwprintf(buf,
-                sizeof(buf),
-                _T("extra data:%s"),
-                utf2unicode((LPCSTR)extra_data_).c_str()
-            );
-            AfxMessageBox(buf, MB_OK);
-        }
-        ).detach();
-        _show_extra = false;
+        _wnd_status_bar.SetText(buff, 1, 0);
     }
 }
 
-int CRtcDemoV2::OnSetMaxDecryptSize(
-    int encrypted_frame_size_,
-    const std::string& track_id_)
+void CRtcDemoV2::OnStarted(const std::string& streamID)
 {
-    return encrypted_frame_size_ + 32;
+    wchar_t buff[1024] = { 0 };
+    _snwprintf(buff, 1024, _T("%s 转推成功"), utf2unicode(streamID).c_str());
+    _wnd_status_bar.SetText(buff, 1, 0);
 }
 
-int CRtcDemoV2::OnDecrypt(
-    const unsigned char* encrypted_frame_,
-    int encrypted_size_,
-    unsigned char* frame_,
-    const std::string& track_id_)
+void CRtcDemoV2::OnStopped(const std::string& streamID)
 {
-    for (size_t i = 0; i < encrypted_size_; i++) {
-        frame_[i] = encrypted_frame_[i] ^ 0xAA;
-    }
-    return encrypted_size_;
+    wchar_t buff[1024] = { 0 };
+    _snwprintf(buff, 1024, _T("%s 停止转推成功"), utf2unicode(streamID).c_str());
+    _wnd_status_bar.SetText(buff, 1, 0);
 }
 
-void CRtcDemoV2::OnVideoDeviceStateChanged(
-    qiniu_v2::VideoDeviceState device_state_, const std::string& device_name_)
+void CRtcDemoV2::OnTranscodingTracksUpdated(const std::string& streamID)
 {
-    thread(
-        [&, device_state_, device_name_] {
-        wchar_t buf[512] = { 0 };
-        if (qiniu_v2::vds_lost == device_state_) {
-            _snwprintf(
-                buf,
-                512,
-                _T("视频设备：%s 被拔出！"),
-                utf2unicode(device_name_).c_str()
-            );
-            AfxMessageBox(buf, MB_OK);
-        }
-    }
-    ).detach();
+    wchar_t buff[1024] = { 0 };
+    _snwprintf(buff, 1024, _T("%s 更新合流布局成功"), utf2unicode(streamID).c_str());
+    _wnd_status_bar.SetText(buff, 1, 0);
 }
 
-void CRtcDemoV2::OnVideoFrame(const unsigned char* raw_data_, int data_len_, 
-    int width_, int height_, qiniu_v2::VideoCaptureType video_type_, 
-    const std::string& track_id_, const std::string& user_id_)
+void CRtcDemoV2::OnError(const std::string& streamID, const QNLiveStreamingErrorInfo& errorInfo)
 {
-
-}
-
-void CRtcDemoV2::OnVideoFramePreview(const unsigned char* raw_data_, int data_len_,
-    int width_, int height_, qiniu_v2::VideoCaptureType video_type_)
-{
-
+    wchar_t buff[1024] = { 0 };
+    _snwprintf(buff, 1024, _T("转推任务失败，type: %d, error code:%d, error msg:%s"),
+        errorInfo.code, errorInfo.code, utf2unicode(errorInfo.message).c_str());
+    _wnd_status_bar.SetText(buff, 1, 0);
 }
 
 void CRtcDemoV2::OnBnClickedButtonLogin()
 {
-    // TODO: Add your control notification handler code here
-    // 设置画面裁剪和缩放参数，在 JoinRoom 之前设置。
-    int clip_crop_source = ((CComboBox*)GetDlgItem(IDC_COMBO_CLIP_CROP))->GetCurSel();
-    if (clip_crop_source == 0) {
-        _src_capturer_source = qiniu_v2::tst_Camera;
-    } else {
-        _src_capturer_source = qiniu_v2::tst_ExternalYUV;
-    }
-
-    if (1 == ((CButton*)GetDlgItem(IDC_CHECK_CLIP))->GetCheck()) {
-        int cropX = GetDlgItemInt(IDC_EDIT_CLIP_X, NULL, 0);
-        int cropY = GetDlgItemInt(IDC_EDIT_CLIP_Y, NULL, 0);
-        int width = GetDlgItemInt(IDC_EDIT_CLIP_WIDTH, NULL, 0);
-        int height = GetDlgItemInt(IDC_EDIT_CLIP_HEIGHT, NULL, 0);
-        _rtc_video_interface->SetCropAndScale(_src_capturer_source, qiniu_v2::p_Crop, true, cropX, cropY, width, height);
-    } else {
-        _rtc_video_interface->SetCropAndScale(_src_capturer_source, qiniu_v2::p_Crop, false, 0, 0, 0, 0);
-    }
-
-    if (1 == ((CButton*)GetDlgItem(IDC_CHECK_SCALE))->GetCheck()) {
-        int width = GetDlgItemInt(IDC_EDIT_SCALE_WIDTH, NULL, 0);
-        int height = GetDlgItemInt(IDC_EDIT_SCALE_HEIGHT, NULL, 0);
-        _rtc_video_interface->SetCropAndScale(_src_capturer_source, qiniu_v2::p_Scale, true, 0, 0, width, height);
-    } else {
-        _rtc_video_interface->SetCropAndScale(_src_capturer_source, qiniu_v2::p_Scale, false, 0, 0, 0, 0);
-    }
-
     CString btn_str;
     GetDlgItemText(IDC_BUTTON_LOGIN, btn_str);
     // 登录房间
     if (btn_str.CompareNoCase(_T("登录")) == 0) {
-        _show_extra = true;
-        if (_enable_encryptor_decryptor) {
-            _rtc_audio_interface->EnableLocalAudioPacketCallBack(true);
-            _rtc_audio_interface->EnableRemoteAudioPacketCallBack(true);
-            SetDlgItemText(IDC_BUTTON_EXTRA_DATA, _T("关闭数据加解密"));
-        }
-        else {
-            SetDlgItemText(IDC_BUTTON_EXTRA_DATA, _T("开启数据加解密"));
-        }
         GetDlgItemText(IDC_EDIT_APPID, _app_id);
         GetDlgItemText(IDC_EDIT_ROOM_ID, _room_name);
         GetDlgItemText(IDC_EDIT_PLAYER_ID, _user_id);
@@ -1473,44 +832,35 @@ void CRtcDemoV2::OnBnClickedButtonLogin()
         _wnd_status_bar.SetText(_T("获取房间 token 成功！"), 1, 0);
         CString dns_ip;
         GetDlgItemText(IDC_IPADDRESS1, dns_ip);
-        _rtc_room_interface->SetDnsServerUrl(unicode2utf(dns_ip.GetBuffer()));
-        _rtc_room_interface->JoinRoom(_room_token);
+        _rtc_client_ptr->SetDnsServerUrl(unicode2utf(dns_ip.GetBuffer()));
+        _rtc_client_ptr->Join(_room_token);
     } else {
-        _rtc_audio_interface->EnableLocalAudioPacketCallBack(false);
-        _rtc_audio_interface->EnableRemoteAudioPacketCallBack(false);
-        // 退出房间前，发布停止合流的命令
-        if (_contain_admin_flag) {
-            _rtc_room_interface->StopMergeStream(string(), 0);
+        if (_stats_pDig) {
+            _stats_pDig->DestroyWindow();
+            delete _stats_pDig;
+            _stats_pDig = nullptr;
         }
-        if (1 == ((CButton*)GetDlgItem(IDC_CHECK_MERGE))->GetCheck()) {
-            _rtc_room_interface->StopMergeStream(_custom_merge_id, 0);
+        _stop_stats_flag = true;
+        _stop_video_external_flag = true;
+        _stop_audio_external_flag = true;
+        if (_fake_audio_thread.joinable()) {
+            _fake_audio_thread.join();
         }
-        _rtc_room_interface->LeaveRoom();
-
-        //退出时，远端画面旋转重置
-        for (auto&& itor : _remote_tracks_map) {
-            if (itor.second->track_info_ptr->GetKind().compare("video") == 0) {
-                if (_rtc_video_interface) {
-                    _rtc_video_interface->SetVideoRotation(itor.first, qiniu_v2::VideoRotation::kVideoRotation_0);
-                }
-            }
+        if (_fake_video_thread.joinable()) {
+            _fake_video_thread.join();
         }
-
+        if (_stats_thread.joinable()) {
+            _stats_thread.join();
+        }
+        Leave();
         SetDlgItemText(IDC_BUTTON_LOGIN, _T("登录"));
         _wnd_status_bar.SetText(_T("当前未登录房间！"), 1, 0);
         _user_list_ctrl.DeleteAllItems();
         ((CButton*)GetDlgItem(IDC_CHECK_MUTE_AUDIO))->SetCheck(0);
         ((CButton*)GetDlgItem(IDC_CHECK_MUTE_VIDEO))->SetCheck(0);
-        GetDlgItem(IDC_BUTTON_SEND_MSG)->EnableWindow(FALSE);
-        GetDlgItem(IDC_COMBO_LOCAL_ROTATION)->EnableWindow(FALSE);
-        GetDlgItem(IDC_COMBO_REMOTE_ROTATION)->EnableWindow(FALSE);
-        ((CComboBox *)GetDlgItem(IDC_COMBO_LOCAL_ROTATION))->SetCurSel(0);
-        ((CComboBox *)GetDlgItem(IDC_COMBO_REMOTE_ROTATION))->SetCurSel(0);
-        GetDlgItem(IDC_BUTTON_SIMULCAST)->EnableWindow(TRUE);
         GetDlgItem(IDC_BUTTON_FORWARD)->EnableWindow(FALSE);
-        GetDlgItem(IDC_BUTTON_EXTRA_DATA)->EnableWindow(TRUE);
+        ((CButton*)GetDlgItem(IDC_CHECK_IMPORT_STATS))->SetCheck(0);
         _remote_tracks_map.clear();
-
         KillTimer(UPDATE_TIME_DURATION_TIMER);
         Invalidate();
     }
@@ -1518,8 +868,7 @@ void CRtcDemoV2::OnBnClickedButtonLogin()
 
 void CRtcDemoV2::OnBnClickedButtonPreviewVideo()
 {
-    // TODO: Add your control notification handler code here
-    if (!_rtc_video_interface) {
+    if (!_rtc_client_ptr) {
         return;
     }
     // 首先获取选中设备 name 和 id
@@ -1543,14 +892,14 @@ void CRtcDemoV2::OnBnClickedButtonPreviewVideo()
     CString btn_text;
     GetDlgItemText(IDC_BUTTON_PREVIEW_VIDEO, btn_text);
     if (btn_text.CompareNoCase(_T("取消预览")) == 0) {
-        _rtc_video_interface->UnPreviewCamera(cur_dev_id);
+        _rtc_client_ptr->UnPreviewCamera(cur_dev_id);
         GetDlgItem(IDC_COMBO_CAMERA)->EnableWindow(TRUE);
         SetDlgItemText(IDC_BUTTON_PREVIEW_VIDEO, _T("预览"));
         GetDlgItem(IDC_STATIC_VIDEO_PREVIEW3)->Invalidate();
         return;
     }
 
-    qiniu_v2::CameraSetting camera_setting;
+    qiniu::QNCameraPreviewSetting camera_setting;
     camera_setting.device_name = unicode2utf(cur_dev_name.GetBuffer());
     camera_setting.device_id   = cur_dev_id;
     camera_setting.width       = 640;
@@ -1558,7 +907,7 @@ void CRtcDemoV2::OnBnClickedButtonPreviewVideo()
     camera_setting.max_fps     = 15;
     camera_setting.render_hwnd = GetDlgItem(IDC_STATIC_VIDEO_PREVIEW3)->m_hWnd;
 
-    if (0 != _rtc_video_interface->PreviewCamera(camera_setting)) {
+    if (0 != _rtc_client_ptr->PreviewCamera(camera_setting)) {
         MessageBox(_T("预览失败！"));
     } else {
         SetDlgItemText(IDC_BUTTON_PREVIEW_VIDEO, _T("取消预览"));
@@ -1568,14 +917,13 @@ void CRtcDemoV2::OnBnClickedButtonPreviewVideo()
 
 void CRtcDemoV2::OnBnClickedBtnFlush()
 {
-    // TODO: Add your control notification handler code here
-    if (!_rtc_video_interface) {
+   if (!_rtc_client_ptr) {
         return;
     }
     ((CComboBox *)GetDlgItem(IDC_COMBO_SCREEN))->ResetContent();
-    int screen_count = _rtc_video_interface->GetScreenWindowCount();
+    int screen_count = _rtc_client_ptr->GetScreenWindowCount();
     for (int i(0); i < screen_count; ++i) {
-        qiniu_v2::ScreenWindowInfo sw = _rtc_video_interface->GetScreenWindowInfo(i);
+        qiniu::QNScreenWindowInfo sw = _rtc_client_ptr->GetScreenWindowInfo(i);
         _screen_info_map[sw.id] = sw;
         ((CComboBox *)GetDlgItem(IDC_COMBO_SCREEN))->InsertString(-1, utf2unicode(sw.title).c_str());
     }
@@ -1584,8 +932,7 @@ void CRtcDemoV2::OnBnClickedBtnFlush()
 
 void CRtcDemoV2::OnBnClickedButtonPreviewScreen()
 {
-    // TODO: Add your control notification handler code here
-    if (!_rtc_video_interface) {
+    if (!_rtc_client_ptr) {
         return;
     }
     // 首先获取选中设备 name 和 id
@@ -1606,18 +953,15 @@ void CRtcDemoV2::OnBnClickedButtonPreviewScreen()
     CString btn_text;
     GetDlgItemText(IDC_BUTTON_PREVIEW_SCREEN, btn_text);
     if (btn_text.CompareNoCase(_T("取消预览")) == 0) {
-        _rtc_video_interface->UnPreviewScreenSource(source_id);
+        _rtc_client_ptr->UnPreviewScreen(source_id);
         GetDlgItem(IDC_COMBO_SCREEN)->EnableWindow(TRUE);
         GetDlgItem(IDC_BTN_FLUSH)->EnableWindow(TRUE);
         SetDlgItemText(IDC_BUTTON_PREVIEW_SCREEN, _T("预览屏幕"));
         GetDlgItem(IDC_STATIC_VIDEO_PREVIEW)->Invalidate();
         return;
     }
-
-    if (0 != _rtc_video_interface->PreviewScreenSource(
-        source_id, 
-        GetDlgItem(IDC_STATIC_VIDEO_PREVIEW4)->m_hWnd, 
-        true) ) {
+    QNScreenPreviewSetting setting = { source_id,GetDlgItem(IDC_STATIC_VIDEO_PREVIEW4)->m_hWnd };
+    if (0 != _rtc_client_ptr->PreviewScreen(setting) ) {
         MessageBox(_T("预览失败！"));
     } else {
         SetDlgItemText(IDC_BUTTON_PREVIEW_SCREEN, _T("取消预览"));
@@ -1628,11 +972,10 @@ void CRtcDemoV2::OnBnClickedButtonPreviewScreen()
 
 void CRtcDemoV2::StartPublish()
 {
-    // TODO: Add your control notification handler code here
-    if (!_rtc_room_interface) {
+    if (!_rtc_client_ptr) {
         return;
     }
-    qiniu_v2::TrackInfoList track_list;
+    LocalTrackList track_list;
 CHECK_CAMERA:
     if (1 == ((CButton*)GetDlgItem(IDC_CHECK_CAMERA))->GetCheck()) {
         CString video_dev_name;
@@ -1654,26 +997,16 @@ CHECK_CAMERA:
             }
             ++itor;
         }
-        // 用户需根据摄像头采集能力集，设置适合自己的图像分辨率、帧率和码率。
         auto camera_size = FindBestVideoSize(_camera_dev_map[video_dev_id].capability_vec);
         int width = std::get<0>(camera_size);
         int height = std::get<1>(camera_size);
-        auto video_track_ptr = qiniu_v2::QNTrackInfo::CreateVideoTrackInfo(
-            video_dev_id,
-            CAMERA_TAG,
-            GetDlgItem(IDC_STATIC_VIDEO_PREVIEW)->m_hWnd,
-            width,
-            height,
-            30,
-            2000000,
-            qiniu_v2::tst_Camera,
-            false,
-            _enable_simulcast     // 是否支持多流发送，只有分辨率大于等于 1280*720 的视频 track 支持多流发送,否则设置为false 
-                                  // 请根据自己需要是否开启多流功能，开启此功能需注意发送端带宽是否支持 
-        );
-        track_list.emplace_back(video_track_ptr);
+        QNCameraVideoTrackConfig camera_info = { width,height,30,2000000,video_dev_id,
+            CAMERA_TAG,GetDlgItem(IDC_STATIC_VIDEO_PREVIEW)->m_hWnd,_enable_simulcast };
+        _camera_track_ptr = QNRTC::CreateCameraVideoTrack(camera_info);
+        if (_camera_track_ptr) {
+            track_list.emplace_back(_camera_track_ptr);
+        }
     }
-
 CHECK_SCREEN:
     if (1 == ((CButton*)GetDlgItem(IDC_CHECK_SCREEN))->GetCheck()) {
         CString wnd_title;
@@ -1686,87 +1019,68 @@ CHECK_SCREEN:
             }
         }
         if (-1 == source_id) {
-            goto CHECK_AUDIO;
+            goto CHECK_CUSTOM_VIDEO;
         }
-        auto video_track_ptr = qiniu_v2::QNTrackInfo::CreateVideoTrackInfo(
-            std::to_string(source_id),
-            SCREENCASTS_TAG,
-            GetDlgItem(IDC_STATIC_VIDEO_PREVIEW2)->m_hWnd,
-            640,
-            480,
-            25,
-            2000000,
-            qiniu_v2::tst_ScreenCasts,
-            false,
-            false
-        );
-        track_list.emplace_back(video_track_ptr);
+        QNScreenVideoTrackConfig screen_info{ 30,2000000,std::to_string(source_id),
+            SCREENCASTS_TAG,GetDlgItem(IDC_STATIC_VIDEO_PREVIEW2)->m_hWnd };
+        _screen_track_ptr = QNRTC::CreateScreenVideoTrack(screen_info);
+        if (_screen_track_ptr) {
+            if (1 == ((CButton*)GetDlgItem(IDC_CHECK_WINDOWS_GRAPHICS))->GetCheck()){
+                _screen_track_ptr->EnableWindowGraphicsCapture(true);
+            }
+            track_list.emplace_back(_screen_track_ptr);
+        }
     }
-CHECK_AUDIO:
-    if (1 == ((CButton*)GetDlgItem(IDC_CHECK_AUDIO))->GetCheck()) {
-        auto audio_track = qiniu_v2::QNTrackInfo::CreateAudioTrackInfo(
-            MICROPHONE_TAG,
-            32000,
-            false
-        );
-        track_list.emplace_back(audio_track);
-    }
-CHECK_EXTERNAL:
+CHECK_CUSTOM_VIDEO:
     if (1 == ((CButton*)GetDlgItem(IDC_CHECK_IMPORT_RAW_DATA))->GetCheck()) {
         // 这里需要设置的是外部视频源对应的分辨率和帧率
-        auto video_track_ptr = qiniu_v2::QNTrackInfo::CreateVideoTrackInfo(
-            "",
-            EXTERNAL_TAG,
-            GetDlgItem(IDC_STATIC_VIDEO_PREVIEW3)->m_hWnd,
-            426,
-            240,
-            30,
-            300000,
-            qiniu_v2::tst_ExternalYUV,
-            false,
-            false
-        );
-        track_list.emplace_back(video_track_ptr);
+        QNCustomVideoTrackConfig video_custom_info = { 426,240,30,300000,EXTERNAL_VIDEO,GetDlgItem(IDC_STATIC_VIDEO_PREVIEW3)->m_hWnd };
+        _custom_video_track_ptr = QNRTC::CreateCustomVideoTrack(video_custom_info);
+        if (_custom_video_track_ptr) {
+            track_list.emplace_back(_custom_video_track_ptr);
+        }
+    }
+CHECK_MICROPHONE:
+    if (1 == ((CButton*)GetDlgItem(IDC_CHECK_AUDIO))->GetCheck()) {
+        ((CButton*)GetDlgItem(IDC_CHECK_IMPORT_RAW_AUDIO_DATA))->SetCheck(0);
+        QNMicrophoneAudioTrackConfig micro_info = { 32000,MICROPHONE_TAG };
+        _microphone_audio_track_ptr = QNRTC::CreateMicrophoneAudioTrack(micro_info);
+        if (_microphone_audio_track_ptr) {
+            track_list.emplace_back(_microphone_audio_track_ptr);
+        }
+    }
+CHECK_CUSTOM_AUDIO:
+    if (1 == ((CButton*)GetDlgItem(IDC_CHECK_IMPORT_RAW_AUDIO_DATA))->GetCheck()) {
+        ((CButton*)GetDlgItem(IDC_CHECK_AUDIO))->SetCheck(0);
+        QNCustomAudioTrackConfig custom_audio_info = { 32000,EXTERNAL_AUDIO };
+        _custom_audio_track_ptr = QNRTC::CreateCustomAudioTrack(custom_audio_info);
+        if (_custom_audio_track_ptr) {
+            track_list.emplace_back(_custom_audio_track_ptr);
+        }
     }
 
     if (!track_list.empty()) {
-        auto ret = _rtc_room_interface->PublishTracks(track_list);
-        if (ret == Err_Tracks_Publish_All_Failed) {
-            thread([]() {
-                AfxMessageBox(_T("全部发布失败，请检查您的网络状态！"));
-            }).detach();
-        } else if (ret == Err_Tracks_Publish_Partial_Failed) {
-            thread([]() {
-                AfxMessageBox(_T("部分发布失败，请检查您的设备状态是否可用？"));
-            }).detach();
-        }
-        qiniu_v2::QNTrackInfo::ReleaseList(track_list);
+        _rtc_client_ptr->Publish(track_list);
     }
 }
 
 void CRtcDemoV2::StopPublish()
 {
-    if (!_rtc_room_interface) {
+    if (!_rtc_client_ptr) {
         return;
     }
     lock_guard<recursive_mutex> lck(_mutex);
-    list<string> track_list;
-    for (auto&& itor : _local_tracks_list) {
-        track_list.emplace_back(itor->GetTrackId());
-    }
-    _rtc_room_interface->UnPublishTracks(track_list);
-
-    qiniu_v2::QNTrackInfo::ReleaseList(_local_tracks_list);
+    _rtc_client_ptr->UnPublish(_local_published_track_list);
 }
 
 void CRtcDemoV2::OnBnClickedCheckCamera()
 {
-    if (!_rtc_room_interface) {
+    if (!_rtc_client_ptr) {
         return;
     }
     lock_guard<recursive_mutex> lck(_mutex);
     if (1 == ((CButton*)GetDlgItem(IDC_CHECK_CAMERA))->GetCheck()) {
-        if (!_rtc_room_interface->IsJoined()) {
+        if (!_rtc_client_ptr->IsJoined()) {
             return;
         }
         CString video_dev_name;
@@ -1789,49 +1103,51 @@ void CRtcDemoV2::OnBnClickedCheckCamera()
             }
             ++itor;
         }
-
+        qiniu::LocalTrackList track_list;
         auto camera_size = FindBestVideoSize(_camera_dev_map[video_dev_id].capability_vec);
-        auto video_track_ptr = qiniu_v2::QNTrackInfo::CreateVideoTrackInfo(
-            video_dev_id,
-            CAMERA_TAG,
-            GetDlgItem(IDC_STATIC_VIDEO_PREVIEW)->m_hWnd,
-            std::get<0>(camera_size),
-            std::get<1>(camera_size),
-            15,
-            500000,
-            qiniu_v2::tst_Camera,
-            false,
-            false
-        );
-        qiniu_v2::TrackInfoList track_list;
-        track_list.push_back(video_track_ptr);
-        auto ret = _rtc_room_interface->PublishTracks(track_list);
-        if (ret != 0) {
-            ((CButton*)GetDlgItem(IDC_CHECK_CAMERA))->SetCheck(0);
-            MessageBox(_T("发布失败，请检查设备状态是否可用？或者不要操作太快！"));
-        } else {
-            // 临时禁用，待发布结果通知后再激活控件，避免频繁操作
-            ((CButton*)GetDlgItem(IDC_CHECK_CAMERA))->EnableWindow(FALSE);
+        int width = std::get<0>(camera_size);
+        int height = std::get<1>(camera_size);
+        if (!_camera_track_ptr) {
+            QNCameraVideoTrackConfig camera_info = { width,height,30,2000000,video_dev_id,
+                    CAMERA_TAG,GetDlgItem(IDC_STATIC_VIDEO_PREVIEW)->m_hWnd,_enable_simulcast };
+            _camera_track_ptr = QNRTC::CreateCameraVideoTrack(camera_info);
+            if (_camera_track_ptr) {
+                track_list.emplace_back(_camera_track_ptr);
+            }
         }
-        video_track_ptr->Release();
+        if (!track_list.empty()) {
+            int ret = _rtc_client_ptr->Publish(track_list);
+            if (ret != 0) {
+                ((CButton*)GetDlgItem(IDC_CHECK_CAMERA))->SetCheck(0);
+                MessageBox(_T("发布失败，请检查设备状态是否可用？或者不要操作太快！"));
+            } else {
+                // 临时禁用，待发布结果通知后再激活控件，避免频繁操作
+                //((CButton*)GetDlgItem(IDC_CHECK_CAMERA))->EnableWindow(FALSE);
+                _wnd_status_bar.SetText(_T("发布摄像头"), 1, 0);
+            }
+        }
     } else {
-        list<string> track_list;
-        if (_local_tracks_list.empty()) {
-            if (_rtc_room_interface->IsJoined()) {
+        qiniu::LocalTrackList track_list;
+        if (_local_published_track_list.empty()) {
+            if (_rtc_client_ptr->IsJoined()) {
                 ((CButton*)GetDlgItem(IDC_CHECK_CAMERA))->SetCheck(1);
             }
             return;
         }
-        auto itor = _local_tracks_list.begin();
-        while (itor != _local_tracks_list.end()) {
-            if ((*itor)->GetTag().compare(CAMERA_TAG) == 0) {
-                track_list.emplace_back((*itor)->GetTrackId());
-                if (Err_Pre_Publish_Not_Complete == _rtc_room_interface->UnPublishTracks(track_list)) {
+        auto itor = _local_published_track_list.begin();
+        while (itor != _local_published_track_list.end()) {
+            if ((*itor)->GetSourceType() == tst_Camera) {
+                track_list.emplace_back(*itor);
+                if (Err_Pre_Publish_Not_Complete == _rtc_client_ptr->UnPublish(track_list)) {
                     ((CButton*)GetDlgItem(IDC_CHECK_CAMERA))->SetCheck(1);
+                } else {
+                    if (_camera_track_ptr) {
+                        _local_published_track_list.erase(itor);
+                        QNRTC::DestroyCameraVideoTrack(_camera_track_ptr);
+                        _camera_track_ptr = nullptr;
+                    }
+                    break;
                 }
-                (*itor)->Release();
-                _local_tracks_list.erase(itor);
-                break;
             }
             ++itor;
         }
@@ -1843,12 +1159,12 @@ void CRtcDemoV2::OnBnClickedCheckCamera()
 void CRtcDemoV2::OnBnClickedCheckScreen()
 {
     // TODO: Add your control notification handler code here
-    if (!_rtc_room_interface) {
+   if (!_rtc_client_ptr) {
         return;
     }
     lock_guard<recursive_mutex> lck(_mutex);
     if (1 == ((CButton*)GetDlgItem(IDC_CHECK_SCREEN))->GetCheck()) {
-        if (!_rtc_room_interface->IsJoined()) {
+        if (!_rtc_client_ptr->IsJoined()) {
             return;
         }
         CString wnd_title;
@@ -1865,48 +1181,53 @@ void CRtcDemoV2::OnBnClickedCheckScreen()
             return;
         }
 
-        auto video_track_ptr2 = qiniu_v2::QNTrackInfo::CreateVideoTrackInfo(
-            std::to_string(source_id),
-            SCREENCASTS_TAG,
-            GetDlgItem(IDC_STATIC_VIDEO_PREVIEW2)->m_hWnd,
-            640,
-            480,
-            25,
-            2000000,
-            qiniu_v2::tst_ScreenCasts,
-            false,
-            false
-        );
-        qiniu_v2::TrackInfoList track_list;
-        track_list.emplace_back(video_track_ptr2);
-        auto ret = _rtc_room_interface->PublishTracks(track_list);
-        if (ret != 0) {
-            ((CButton*)GetDlgItem(IDC_CHECK_SCREEN))->SetCheck(0);
-            MessageBox(_T("发布失败，请检查设备状态是否可用？或者不要操作太快！"));
-        } else {
-            // 临时禁用，待发布结果通知后再激活控件，避免频繁操作
-            ((CButton*)GetDlgItem(IDC_CHECK_SCREEN))->EnableWindow(FALSE);
+        qiniu::LocalTrackList track_list;
+        if (!_screen_track_ptr) {
+            QNScreenVideoTrackConfig screen_info{ 30,2000000,std::to_string(source_id),
+                    SCREENCASTS_TAG,GetDlgItem(IDC_STATIC_VIDEO_PREVIEW2)->m_hWnd };
+            _screen_track_ptr = QNRTC::CreateScreenVideoTrack(screen_info);
+            if (_screen_track_ptr) {
+                if (1 == ((CButton*)GetDlgItem(IDC_CHECK_WINDOWS_GRAPHICS))->GetCheck()) {
+                    _screen_track_ptr->EnableWindowGraphicsCapture(true);
+                }
+                track_list.emplace_back(_screen_track_ptr);
+            }
         }
-        video_track_ptr2->Release();
+
+        if (!track_list.empty()) {
+            auto ret = _rtc_client_ptr->Publish(track_list);
+            if (ret != 0) {
+                ((CButton*)GetDlgItem(IDC_CHECK_SCREEN))->SetCheck(0);
+                MessageBox(_T("发布失败，请检查设备状态是否可用？或者不要操作太快！"));
+            } else {
+                // 临时禁用，待发布结果通知后再激活控件，避免频繁操作
+                //((CButton*)GetDlgItem(IDC_CHECK_SCREEN))->EnableWindow(FALSE);
+                _wnd_status_bar.SetText(_T("发布屏幕分享"), 1, 0);
+            }
+        }
     } else {
-        list<string> track_list;
-        if (_local_tracks_list.empty()) {
-            if (_rtc_room_interface->IsJoined()) {
+        qiniu::LocalTrackList track_list;
+        if (_local_published_track_list.empty()) {
+            if (_rtc_client_ptr->IsJoined()) {
                 ((CButton*)GetDlgItem(IDC_CHECK_SCREEN))->SetCheck(1);
             }
             return;
         }
-        auto itor = _local_tracks_list.begin();
-        while (itor != _local_tracks_list.end())
+        auto itor = _local_published_track_list.begin();
+        while (itor != _local_published_track_list.end())
         {
-            if ((*itor)->GetTag().compare(SCREENCASTS_TAG) == 0) {
-                track_list.emplace_back((*itor)->GetTrackId());
-                if (Err_Pre_Publish_Not_Complete == _rtc_room_interface->UnPublishTracks(track_list)) {
+            if ((*itor)->GetSourceType() == tst_ScreenCasts) {
+                track_list.emplace_back(*itor);
+                if (Err_Pre_Publish_Not_Complete == _rtc_client_ptr->UnPublish(track_list)) {
                     ((CButton*)GetDlgItem(IDC_CHECK_SCREEN))->SetCheck(1);
+                } else {
+                    if (_screen_track_ptr) {
+                        _local_published_track_list.erase(itor);
+                        QNRTC::DestroyScreenVideoTrack(_screen_track_ptr);
+                        _screen_track_ptr = nullptr;
+                    }
+                    break;
                 }
-                (*itor)->Release();
-                _local_tracks_list.erase(itor);
-                break;
             }
             ++itor;
         }
@@ -1915,150 +1236,212 @@ void CRtcDemoV2::OnBnClickedCheckScreen()
     }
 }
 
-
 void CRtcDemoV2::OnBnClickedCheckAudio()
 {
-    // TODO: Add your control notification handler code here
-    if (!_rtc_room_interface) {
+    if (!_rtc_client_ptr) {
         return;
     }
     ((CButton*)GetDlgItem(IDC_CHECK_MUTE_AUDIO))->SetCheck(0);
 
     lock_guard<recursive_mutex> lck(_mutex);
     if (1 == ((CButton*)GetDlgItem(IDC_CHECK_AUDIO))->GetCheck()) {
-        if (!_rtc_room_interface->IsJoined()) {
+        if (!_rtc_client_ptr->IsJoined()) {
             return;
         }
-
-        OnCbnSelchangeComboMicrophone();
-
-        auto audio_track = qiniu_v2::QNTrackInfo::CreateAudioTrackInfo(
-            MICROPHONE_TAG,
-            32000,
-            false
-        );
-        qiniu_v2::TrackInfoList track_list;
-        track_list.emplace_back(audio_track);
-        auto ret = _rtc_room_interface->PublishTracks(track_list);
-        if (ret != 0) {
-            ((CButton*)GetDlgItem(IDC_CHECK_AUDIO))->SetCheck(0);
-            MessageBox(_T("发布失败，请检查设备状态是否可用？或者不要操作太快！"));
-        } else {
-            // 临时禁用，待发布结果通知后再激活控件，避免频繁操作
-            ((CButton*)GetDlgItem(IDC_CHECK_AUDIO))->EnableWindow(FALSE);
+        qiniu::LocalTrackList track_list;
+        if (!_microphone_audio_track_ptr) {
+            QNMicrophoneAudioTrackConfig micro_info = { 32000,MICROPHONE_TAG };
+            _microphone_audio_track_ptr = QNRTC::CreateMicrophoneAudioTrack(micro_info);
+            if (_microphone_audio_track_ptr) {
+                track_list.emplace_back(_microphone_audio_track_ptr);
+            } else {
+                MessageBox(_T("请关闭音频外部导入再开启麦克风采集！"));
+                ((CButton*)GetDlgItem(IDC_CHECK_AUDIO))->SetCheck(0);
+                return;
+            }
         }
-        audio_track->Release();
+
+        if (!track_list.empty()) {
+            auto ret = _rtc_client_ptr->Publish(track_list);
+            if (ret != 0) {
+                ((CButton*)GetDlgItem(IDC_CHECK_SCREEN))->SetCheck(0);
+                MessageBox(_T("发布失败，请检查设备状态是否可用？或者不要操作太快！"));
+            } else {
+                // 临时禁用，待发布结果通知后再激活控件，避免频繁操作
+                //((CButton*)GetDlgItem(IDC_CHECK_SCREEN))->EnableWindow(FALSE);
+                _wnd_status_bar.SetText(_T("发布麦克风"), 1, 0);
+            }
+        }
     } else {
-        list<string> track_list;
-        if (_local_tracks_list.empty()) {
-            if (_rtc_room_interface->IsJoined()) {
+        qiniu::LocalTrackList track_list;
+        if (_local_published_track_list.empty()) {
+            if (_rtc_client_ptr->IsJoined()) {
                 ((CButton*)GetDlgItem(IDC_CHECK_AUDIO))->SetCheck(1);
             }
             return;
         }
-        auto itor = _local_tracks_list.begin();
-        while (itor != _local_tracks_list.end()) {
-            if ((*itor)->GetTag().compare(MICROPHONE_TAG) == 0) {
-                track_list.emplace_back((*itor)->GetTrackId());
-                if (Err_Pre_Publish_Not_Complete == _rtc_room_interface->UnPublishTracks(track_list)) {
+        auto itor = _local_published_track_list.begin();
+        while (itor != _local_published_track_list.end()) {
+            if ((*itor)->GetSourceType()== tst_Microphone) {
+                track_list.emplace_back(*itor);
+                if (Err_Pre_Publish_Not_Complete == _rtc_client_ptr->UnPublish(track_list)) {
                     ((CButton*)GetDlgItem(IDC_CHECK_AUDIO))->SetCheck(1);
+                } else {
+                    if (_microphone_audio_track_ptr) {
+                        _local_published_track_list.erase(itor);
+                        QNRTC::DestroyMicrophoneAudioTrack(_microphone_audio_track_ptr);
+                        _microphone_audio_track_ptr = nullptr;
+                    }
+                    break;
                 }
-
-                (*itor)->Release();
-                _local_tracks_list.erase(itor);
-                break;
             }
             ++itor;
         }
-        _wnd_status_bar.SetText(_T("取消发布音频"), 1, 0);
+        _wnd_status_bar.SetText(_T("取消发布麦克风"), 1, 0);
     }
 }
 
 void CRtcDemoV2::OnBnClickedCheckImportRawData()
 {
-    // TODO: Add your control notification handler code here
-    if (!_rtc_room_interface) {
+    if (!_rtc_client_ptr) {
         return;
     }
     lock_guard<recursive_mutex> lck(_mutex);
     if (1 == ((CButton*)GetDlgItem(IDC_CHECK_IMPORT_RAW_DATA))->GetCheck()) {
-        if (!_rtc_room_interface->IsJoined()) {
+        if (!_rtc_client_ptr->IsJoined()) {
             return;
         }
-        _rtc_audio_interface->EnableAudioFakeInput(true);
-        auto video_track_ptr = qiniu_v2::QNTrackInfo::CreateVideoTrackInfo(
-            "",
-            EXTERNAL_TAG,
-            GetDlgItem(IDC_STATIC_VIDEO_PREVIEW3)->m_hWnd,
-            426,
-            240,
-            30,
-            300000,
-            qiniu_v2::tst_ExternalYUV,
-            false,
-            false
-        );
-        qiniu_v2::TrackInfoList track_list;
-        track_list.emplace_back(video_track_ptr);
-        auto ret = _rtc_room_interface->PublishTracks(track_list);
-        if (ret != 0) {
-            ((CButton*)GetDlgItem(IDC_CHECK_IMPORT_RAW_DATA))->SetCheck(0);
-            MessageBox(_T("发布失败，请检查设备状态是否可用？或者不要操作太快！"));
-        } else {
-            // 临时禁用，待发布结果通知后再激活控件，避免频繁操作
-            ((CButton*)GetDlgItem(IDC_CHECK_IMPORT_RAW_DATA))->EnableWindow(FALSE);
+        LocalTrackList track_list;
+        if (!_custom_video_track_ptr) {
+            QNCustomVideoTrackConfig video_custom_info = { 426,240,30,300000,EXTERNAL_VIDEO,GetDlgItem(IDC_STATIC_VIDEO_PREVIEW3)->m_hWnd };
+            _custom_video_track_ptr = QNRTC::CreateCustomVideoTrack(video_custom_info);
+            if (_custom_video_track_ptr) {
+                track_list.emplace_back(_custom_video_track_ptr);
+            }
         }
-        video_track_ptr->Release();
-    } else {
-        _rtc_audio_interface->EnableAudioFakeInput(false);
 
-        list<string> track_list;
-        if (_local_tracks_list.empty()) {
-            if (_rtc_room_interface->IsJoined()) {
+        if (!track_list.empty()) {
+            auto ret = _rtc_client_ptr->Publish(track_list);
+            if (ret != 0) {
+                ((CButton*)GetDlgItem(IDC_CHECK_IMPORT_RAW_DATA))->SetCheck(0);
+                MessageBox(_T("发布失败，请检查设备状态是否可用？或者不要操作太快！"));
+            }
+            else {
+                // 临时禁用，待发布结果通知后再激活控件，避免频繁操作
+                //((CButton*)GetDlgItem(IDC_CHECK_IMPORT_RAW_DATA))->EnableWindow(FALSE);
+            }
+        }
+    } else {
+        qiniu::LocalTrackList track_list;
+        if (_local_published_track_list.empty()) {
+            if (_rtc_client_ptr->IsJoined()) {
                 ((CButton*)GetDlgItem(IDC_CHECK_IMPORT_RAW_DATA))->SetCheck(1);
             }
             return;
         }
-        auto itor = _local_tracks_list.begin();
-        while (itor != _local_tracks_list.end()) {
-            if ((*itor)->GetTag().compare(EXTERNAL_TAG) == 0) {
-                track_list.emplace_back((*itor)->GetTrackId());
-                if (Err_Pre_Publish_Not_Complete == _rtc_room_interface->UnPublishTracks(track_list)) {
+        auto itor = _local_published_track_list.begin();
+        while (itor != _local_published_track_list.end()) {
+            if ((*itor)->GetSourceType()== tst_ExternalYUV) {
+                track_list.emplace_back(*itor);
+                if (Err_Pre_Publish_Not_Complete == _rtc_client_ptr->UnPublish(track_list)) {
                     ((CButton*)GetDlgItem(IDC_CHECK_IMPORT_RAW_DATA))->SetCheck(1);
+                } else {
+                    if (_custom_video_track_ptr) {
+                        _stop_video_external_flag = true;
+                        _local_published_track_list.erase(itor);
+                        QNRTC::DestroyCustomVideoTrack(_custom_video_track_ptr);
+                        _custom_video_track_ptr = nullptr;
+                    }
                 }
-                (*itor)->Release();
-                _local_tracks_list.erase(itor);
                 break;
             }
             ++itor;
         }
         GetDlgItem(IDC_STATIC_VIDEO_PREVIEW3)->Invalidate();
-
-        _stop_external_flag = true;
-        if (_fake_audio_thread.joinable()) {
-            _fake_audio_thread.join();
-        }
         if (_fake_video_thread.joinable()) {
             _fake_video_thread.join();
         }
-        _wnd_status_bar.SetText(_T("取消发布外部导入"), 1, 0);
-        AdjustMergeStreamLayouts();
+        _wnd_status_bar.SetText(_T("取消视频发布外部导入"), 1, 0);
     }
 }
 
-void CRtcDemoV2::ImportExternalRawFrame(const string& track_id_)
+void CRtcDemoV2::OnBnClickedCheckImportRawAudioData()
 {
-    // 模拟导入视频数据,当前使用当前目录下指定的音视频文件
-    _stop_external_flag = true;
+    if (!_rtc_client_ptr) {
+        return;
+    }
+    lock_guard<recursive_mutex> lck(_mutex);
+    if (1 == ((CButton*)GetDlgItem(IDC_CHECK_IMPORT_RAW_AUDIO_DATA))->GetCheck()) {
+        if (!_rtc_client_ptr->IsJoined()) {
+            return;
+        }
+
+        LocalTrackList track_list;
+        if (!_custom_audio_track_ptr) {
+            QNCustomAudioTrackConfig custom_audio_info = { 32000,EXTERNAL_AUDIO };
+            _custom_audio_track_ptr = QNRTC::CreateCustomAudioTrack(custom_audio_info);
+            if (_custom_audio_track_ptr) {
+                track_list.emplace_back(_custom_audio_track_ptr);
+            } else {
+                MessageBox(_T("请关闭麦克风采集再开启音频外部导入！"));
+                ((CButton*)GetDlgItem(IDC_CHECK_IMPORT_RAW_AUDIO_DATA))->SetCheck(0);
+                return;
+            }
+        }
+
+        if (!track_list.empty()) {
+            auto ret = _rtc_client_ptr->Publish(track_list);
+            if (ret != 0) {
+                ((CButton*)GetDlgItem(IDC_CHECK_IMPORT_RAW_AUDIO_DATA))->SetCheck(0);
+                MessageBox(_T("发布失败，请检查设备状态是否可用？或者不要操作太快！"));
+            }
+            else {
+                // 临时禁用，待发布结果通知后再激活控件，避免频繁操作
+                //((CButton*)GetDlgItem(IDC_CHECK_IMPORT_RAW_DATA))->EnableWindow(FALSE);
+            }
+        }
+    } else {
+        qiniu::LocalTrackList track_list;
+        if (_local_published_track_list.empty()) {
+            if (_rtc_client_ptr->IsJoined()) {
+                ((CButton*)GetDlgItem(IDC_CHECK_IMPORT_RAW_AUDIO_DATA))->SetCheck(1);
+            }
+            return;
+        }
+        auto itor = _local_published_track_list.begin();
+        while (itor != _local_published_track_list.end()) {
+            if ((*itor)->GetSourceType() == tst_ExternalPCM) {
+                track_list.emplace_back(*itor);
+                if (Err_Pre_Publish_Not_Complete == _rtc_client_ptr->UnPublish(track_list)) {
+                    ((CButton*)GetDlgItem(IDC_CHECK_IMPORT_RAW_AUDIO_DATA))->SetCheck(1);
+                } else {
+                    _stop_audio_external_flag = true;
+                    if (_custom_audio_track_ptr) {
+                        _local_published_track_list.erase(itor);
+                        QNRTC::DestroyCustomAudioTrack(_custom_audio_track_ptr);
+                        _custom_audio_track_ptr = nullptr;
+                    }
+                }
+                break;
+            }
+            ++itor;
+        }
+        if (_fake_audio_thread.joinable()) {
+            _fake_audio_thread.join();
+        }
+        _wnd_status_bar.SetText(_T("取消音频发布外部导入"), 1, 0);
+    }
+}
+
+void CRtcDemoV2::ImportExternalVideoRawFrame()
+{
+    // 模拟导入视频数据,当前使用当前目录下指定的视频文件
+    _stop_video_external_flag = true;
     if (_fake_video_thread.joinable()) {
         _fake_video_thread.join();
     }
-    if (_fake_audio_thread.joinable()) {
-        _fake_audio_thread.join();
-    }
 
-    string track_id(track_id_.c_str());
-    _fake_video_thread = thread([&, track_id] {
+    _fake_video_thread = thread([&] {
         FILE* fp = nullptr;
         fopen_s(&fp, "426x240.yuv", "rb");
         uint8_t *buf = (uint8_t*)malloc(426 * 240 * 3 / 2);
@@ -2067,20 +1450,19 @@ void CRtcDemoV2::ImportExternalRawFrame(const string& track_id_)
             return;
         }
         size_t ret(0);
-        _stop_external_flag = false;
+        _stop_video_external_flag = false;
         chrono::system_clock::time_point start_tp = chrono::system_clock::now();
-        while (!_stop_external_flag) {
+        while (!_stop_video_external_flag && _custom_video_track_ptr) {
             ret = fread_s(buf, 426 * 240 * 3 / 2, 1, 426 * 240 * 3 / 2, fp);
             if (ret > 0) {
-                _rtc_video_interface->InputVideoFrame(
-                    track_id,
+                _custom_video_track_ptr->PushVideoFrame(
                     buf,
                     426 * 240 * 3 / 2,
                     426,
                     240,
                     chrono::duration_cast<chrono::microseconds>(chrono::system_clock::now() - start_tp).count(),
-                    qiniu_v2::VideoCaptureType::kI420,
-                    qiniu_v2::kVideoRotation_0);
+                    qiniu::QNVideoSourceType::kI420,
+                    qiniu::kVideoRotation_0);
             } else {
                 fseek(fp, 0, SEEK_SET);
                 continue;
@@ -2090,9 +1472,16 @@ void CRtcDemoV2::ImportExternalRawFrame(const string& track_id_)
         free(buf);
         fclose(fp);
     });
+}
 
+void CRtcDemoV2::ImportExternalAudioRawFrame()
+{
+    // 模拟导入音频数据,当前使用当前目录下指定的音频文件
+    if (_fake_audio_thread.joinable()) {
+        _fake_audio_thread.join();
+    }
     // 模拟导入音频数据
-    _rtc_audio_interface->EnableAudioFakeInput(true);
+    _stop_audio_external_flag = true;
     _fake_audio_thread = thread([&] {
         FILE* fp = nullptr;
         fopen_s(&fp, "44100_16bits_2channels.pcm", "rb");
@@ -2104,9 +1493,10 @@ void CRtcDemoV2::ImportExternalRawFrame(const string& track_id_)
         uint8_t *buf = (uint8_t*)malloc(441 * 2 * 2 * 2);
 
         size_t ret(0);
+        _stop_audio_external_flag = false;
         chrono::system_clock::time_point start_tp = chrono::system_clock::now();
         int64_t audio_frame_count(0);
-        while (!_stop_external_flag) {
+        while (!_stop_audio_external_flag &&  _custom_audio_track_ptr) {
             if (chrono::duration_cast<chrono::microseconds>(chrono::system_clock::now() - start_tp).count() >= audio_frame_count * 20000) {
             } else {
                 Sleep(10);
@@ -2115,7 +1505,7 @@ void CRtcDemoV2::ImportExternalRawFrame(const string& track_id_)
 
             ret = fread_s(buf, 441 * 2 * 4, 1, 441 * 2 * 4, fp);
             if (ret >= 441 * 8) {
-                _rtc_audio_interface->InputAudioFrame(
+                _custom_audio_track_ptr->PushAudioFrame(
                     buf,
                     441 * 8,
                     16,
@@ -2134,10 +1524,13 @@ void CRtcDemoV2::ImportExternalRawFrame(const string& track_id_)
     });
 }
 
-void CRtcDemoV2::CreateCustomMergeJob()
+void CRtcDemoV2::CreateCustomMergeJob(bool open)
 {
-    qiniu_v2::MergeJob job_desc;
-    job_desc.job_id         = unicode2utf(_room_name.GetBuffer()) + "_merge";
+    if (!_rtc_client_ptr) {
+        return;
+    }
+    qiniu::QNTranscodingLiveStreamingConfig job_desc;
+    job_desc.stream_id      = unicode2utf(_room_name.GetBuffer()) + "_merge";
     job_desc.publish_url    = _merge_config.publish_url;
     job_desc.width          = _merge_config.job_width;
     job_desc.height         = _merge_config.job_height;
@@ -2145,113 +1538,60 @@ void CRtcDemoV2::CreateCustomMergeJob()
     job_desc.bitrate        = _merge_config.job_bitrate;
     job_desc.min_bitrate    = _merge_config.job_min_bitrate;
     job_desc.max_bitrate    = _merge_config.job_max_bitrate;
-    job_desc.stretch_mode = (qiniu_v2::MergeStretchMode)(_merge_config.job_stretch_mode);
+    job_desc.stretch_mode = (qiniu::QNStretchMode)(_merge_config.job_stretch_mode);
     job_desc.is_hold_last_frame = _merge_config.hold_last_frame;
 
-    qiniu_v2::MergeLayer background;
+    qiniu::QNTranscodingLiveStreamingImage background;
     background.layer_url    = _merge_config.background_url;
     background.pos_x        = _merge_config.background_x;
     background.pos_y        = _merge_config.background_y;
     background.layer_width  = _merge_config.background_width;
     background.layer_height = _merge_config.background_height;
+    job_desc.merge_background = background;
 
-    qiniu_v2::MergeLayerList watermarks;
-    qiniu_v2::MergeLayer mark;
+    qiniu::QNTranscodingLiveStreamingImage mark;
     mark.layer_url      = _merge_config.watermark_url;
     mark.pos_x          = _merge_config.watermark_x;
     mark.pos_y          = _merge_config.watermark_y;
     mark.layer_width    = _merge_config.watermark_width;
     mark.layer_height   = _merge_config.watermark_height;
-    watermarks.emplace_back(mark);
+    job_desc.merge_watermark.emplace_back(mark);
 
-    _custom_merge_id = job_desc.job_id;
-    _rtc_room_interface->CreateMergeJob(job_desc, background, watermarks);
+    _custom_merge_id = job_desc.stream_id;
+    if (open) {
+        _rtc_client_ptr->StartLiveStreaming(job_desc);
+    } else {
+        _rtc_client_ptr->StopLiveStreaming(job_desc);
+    }
+
 }
 
 void CRtcDemoV2::AdjustMergeStreamLayouts()
 {
-    if (_contain_admin_flag) {
-        struct Pos
-        {
-            int pos_x = 0;
-            int pos_y = 0;
-        };
-        Pos merge_opts[9];
-        for (int i(0); i < 3; ++i) {
-            for (int j(0); j < 3; ++j) {
-                merge_opts[i * 3 + j] = {j * CANVAS_WIDTH / 3, i * CANVAS_HEIGHT / 3};
-            }
-        }
-        qiniu_v2::MergeOptInfoList add_tracks_list;
-        list<string> remove_tracks_list;
-        int num(-1);
-        for (auto&& itor : _local_tracks_list) {
-            qiniu_v2::MergeOptInfo merge_opt;
-            merge_opt.track_id = itor->GetTrackId();
-            merge_opt.is_video = true;
-            if (itor->GetKind().compare("audio") == 0) {
-                merge_opt.is_video = false;
-                add_tracks_list.emplace_back(merge_opt);
-                continue;
-            }
-            // Demo 保证视频九宫格布局
-            if (itor->IsMaster()) {
-                merge_opt.pos_x = 0;
-                merge_opt.pos_y = 0;
-                merge_opt.pos_z = 0;
-                merge_opt.width = CANVAS_WIDTH;
-                merge_opt.height = CANVAS_HEIGHT;
-            } else {
-                ++num;
-                merge_opt.pos_x = merge_opts[num].pos_x;
-                merge_opt.pos_y = merge_opts[num].pos_y;
-                merge_opt.pos_z = 1;
-                merge_opt.width = CANVAS_WIDTH / 3;
-                merge_opt.height = CANVAS_HEIGHT / 3;
-            }
-            add_tracks_list.emplace_back(merge_opt);
-        }
-        for (auto&& itor : _remote_tracks_map) {
-            qiniu_v2::MergeOptInfo merge_opt;
-            merge_opt.track_id = itor.second->track_info_ptr->GetTrackId();
-            merge_opt.is_video = true;
-            if (itor.second->track_info_ptr->GetKind().compare("audio") == 0) {
-                merge_opt.is_video = false;
-                add_tracks_list.emplace_back(merge_opt);
-                continue;
-            }
-            // Demo 保证视频九宫格布局
-            ++num;
-            merge_opt.pos_x = merge_opts[num].pos_x;
-            merge_opt.pos_y = merge_opts[num].pos_y;
-            merge_opt.pos_z = 1;
-            merge_opt.width = CANVAS_WIDTH / 3;
-            merge_opt.height = CANVAS_HEIGHT / 3;
-            add_tracks_list.emplace_back(merge_opt);
-        }
-        _rtc_room_interface->SetMergeStreamlayouts(add_tracks_list, remove_tracks_list);
-    }
-
-
     // 自定义合流，根据界面配置使用一个本地或者远端 track 
+    if (!_rtc_client_ptr) {
+        return;
+    }
     if (1 == ((CButton*)GetDlgItem(IDC_CHECK_MERGE))->GetCheck()) {
-
-        qiniu_v2::MergeOptInfoList add_tracks_list;
+        CreateCustomMergeJob(true);
+        qiniu::QNTranscodeingTrackList add_tracks_list;
         list<string> remove_tracks_list;
-        for (auto&& itor : _local_tracks_list) {
-            qiniu_v2::MergeOptInfo merge_opt;
-            merge_opt.track_id = itor->GetTrackId();
+
+        if (_microphone_audio_track_ptr) {
+            qiniu::QNTranscodingLiveStreamingTrack merge_opt;
+            merge_opt.track_id = _microphone_audio_track_ptr->GetTrackID();
+            merge_opt.is_video = false;
+            add_tracks_list.emplace_back(merge_opt);
+        }
+
+        if (_camera_track_ptr) {
+            qiniu::QNTranscodingLiveStreamingTrack merge_opt;
+            merge_opt.track_id = _camera_track_ptr->GetTrackID();
             merge_opt.is_video = true;
-            if (itor->GetKind().compare("audio") == 0 && _merge_config.merge_local_audio) {
-                merge_opt.is_video = false;
-                add_tracks_list.emplace_back(merge_opt);
-                continue;
-            }
-            
             if (_merge_config.merge_local_video) {
                 // 这里只做演示，用户可根据自己需求设置相应 video track 合流时的填充模式
                 if (1 == ((CButton*)GetDlgItem(IDC_CHECK_STRETCH_MODE))->GetCheck()) {
-                    merge_opt.stretchMode = qiniu_v2::SCALE_TO_FIT;
+                    merge_opt.stretchMode = qiniu::SCALE_TO_FIT;
                 }
                 merge_opt.pos_x = _merge_config.local_video_x;
                 merge_opt.pos_y = _merge_config.local_video_y;
@@ -2259,35 +1599,45 @@ void CRtcDemoV2::AdjustMergeStreamLayouts()
                 merge_opt.width = _merge_config.local_video_width;
                 merge_opt.height = _merge_config.local_video_height;
                 merge_opt.is_support_sei = true;
-                add_tracks_list.emplace_back(merge_opt);
             }
+            add_tracks_list.emplace_back(merge_opt);
         }
 
-        for (auto&& itor : _remote_tracks_map) {
-            qiniu_v2::MergeOptInfo merge_opt;
-            merge_opt.track_id = itor.second->track_info_ptr->GetTrackId();
-            merge_opt.is_video = true;
-            if (itor.second->track_info_ptr->GetKind().compare("audio") == 0 && _merge_config.merge_remote_audio) {
-                merge_opt.is_video = false;
-                add_tracks_list.emplace_back(merge_opt);
-                continue;
-            }
-
-            if (_merge_config.merge_remote_video) {
-                // 这里只做演示，用户可根据自己需求设置相应 video track 合流时的填充模式
-                if (1 == ((CButton*)GetDlgItem(IDC_CHECK_STRETCH_MODE))->GetCheck()) {
-                    merge_opt.stretchMode = qiniu_v2::SCALE_TO_FIT;
+        RemoteUserList remoteList = _rtc_client_ptr->GetRemoteUsers();
+        for (auto&& itor : remoteList) {
+            for (auto && audio_itor : itor.remote_audio_tracks) {
+                if (_merge_config.merge_remote_audio) {
+                    qiniu::QNTranscodingLiveStreamingTrack merge_opt;
+                    merge_opt.track_id = audio_itor->GetTrackID();
+                    merge_opt.is_video = false;
+                    add_tracks_list.emplace_back(merge_opt);
+                    break;
                 }
-                merge_opt.pos_x = _merge_config.remote_video_x;
-                merge_opt.pos_y = _merge_config.remote_video_y;
-                merge_opt.pos_z = 1;
-                merge_opt.width = _merge_config.remote_video_width;
-                merge_opt.height = _merge_config.remote_video_height;
-                merge_opt.is_support_sei = false;
-                add_tracks_list.emplace_back(merge_opt);
+            }
+
+            for (auto && video_itor : itor.remote_video_tracks) {
+                qiniu::QNTranscodingLiveStreamingTrack merge_opt;
+                merge_opt.track_id = video_itor->GetTrackID();
+                merge_opt.is_video = true;
+                if (_merge_config.merge_remote_video) {
+                    // 这里只做演示，用户可根据自己需求设置相应 video track 合流时的填充模式
+                    if (1 == ((CButton*)GetDlgItem(IDC_CHECK_STRETCH_MODE))->GetCheck()) {
+                        merge_opt.stretchMode = qiniu::SCALE_TO_FIT;
+                    }
+                    merge_opt.pos_x = _merge_config.remote_video_x;
+                    merge_opt.pos_y = _merge_config.remote_video_y;
+                    merge_opt.pos_z = 1;
+                    merge_opt.width = _merge_config.remote_video_width;
+                    merge_opt.height = _merge_config.remote_video_height;
+                    merge_opt.is_support_sei = false;
+                    add_tracks_list.emplace_back(merge_opt);
+                    break;
+                }
             }
         }
-        _rtc_room_interface->SetMergeStreamlayouts(add_tracks_list, remove_tracks_list, _custom_merge_id);
+        _rtc_client_ptr->SetTranscodingLiveStreamingTracks(_custom_merge_id, add_tracks_list);
+    } else {
+        CreateCustomMergeJob(false);
     }
 }
 
@@ -2328,75 +1678,122 @@ void CRtcDemoV2::AdjustSubscribeLayouts()
     }
 }
 
-void CRtcDemoV2::OnBnClickedCheckDesktopAudio()
+void CRtcDemoV2::AdjustStatsLayouts()
 {
-    // TODO: Add your control notification handler code here
-    if (!_rtc_audio_interface) {
+    if (!_stats_pDig) {
         return;
     }
-    if (1 == ((CButton*)GetDlgItem(IDC_CHECK_DESKTOP_AUDIO))->GetCheck()) {
-        _rtc_audio_interface->MixDesktopAudio(true);
-    } else {
-        _rtc_audio_interface->MixDesktopAudio(false);
-    }
+
+    RECT wnd_rc;
+    GetWindowRect(&wnd_rc);
+    TRACE("MainDialog rect x:%d, y:%d, right:%d, botton:%d\n",
+        wnd_rc.left,
+        wnd_rc.top,
+        wnd_rc.right,
+        wnd_rc.bottom
+    );
+    int main_wnd_height = wnd_rc.bottom - wnd_rc.top;
+    const int wnd_width = 700;
+    const int wnd_height = 400;
+    int start_x = wnd_rc.right;
+    int start_y = wnd_rc.top;
+    _stats_pDig->MoveWindow(
+        start_x,
+        start_y,
+        wnd_width,
+        wnd_height
+    );
 }
 
-void CRtcDemoV2::OnBnClickedBtnKickout()
+void CRtcDemoV2::Leave()
 {
-    // TODO: Add your control notification handler code here
-    if (!_rtc_room_interface || !_rtc_room_interface->IsJoined()) {
+    if (_rtc_client_ptr) {
+        _rtc_client_ptr->Leave();
+    }
+
+    if (_camera_track_ptr) {
+        QNRTC::DestroyCameraVideoTrack(_camera_track_ptr);
+        _camera_track_ptr = nullptr;
+    }
+
+    if (_screen_track_ptr) {
+        QNRTC::DestroyScreenVideoTrack(_screen_track_ptr);
+        _screen_track_ptr = nullptr;
+    }
+
+    if (_custom_video_track_ptr) {
+        QNRTC::DestroyCustomVideoTrack(_custom_video_track_ptr);
+        _custom_video_track_ptr = nullptr;
+    }
+
+    if (_microphone_audio_track_ptr) {
+        QNRTC::DestroyMicrophoneAudioTrack(_microphone_audio_track_ptr);
+        _microphone_audio_track_ptr = nullptr;
+    }
+
+    if (_custom_audio_track_ptr) {
+        QNRTC::DestroyCustomAudioTrack(_custom_audio_track_ptr);
+        _custom_audio_track_ptr = nullptr;
+    }
+
+    _local_published_track_list.clear();
+}
+
+void CRtcDemoV2::OnBnClickedCheckDesktopAudio()
+{
+    if (!_microphone_audio_track_ptr && !_custom_audio_track_ptr) {
         return;
     }
-    if (!_contain_admin_flag) {
-        MessageBox(_T("您当前没有踢人权限，请使用 admin 进行登录！"));
-        return;
-    } else {
-        int index = _user_list_ctrl.GetSelectionMark();
-        if (index == -1) {
-            MessageBox(_T("请选中要踢出的用户！"));
-            return;
-        }
-        // 所选择的用户当前没有发布媒体流
-        CString user_id = _user_list_ctrl.GetItemText(index, 0);
 
-        if (_rtc_room_interface) {
-            _rtc_room_interface->KickoutUser(unicode2utf(user_id.GetBuffer()).c_str());
-        }
+    bool mixDesktopAudio = false;
+    if (1 == ((CButton*)GetDlgItem(IDC_CHECK_DESKTOP_AUDIO))->GetCheck()) {
+        mixDesktopAudio = true;
+    }
+
+    if (_microphone_audio_track_ptr) {
+        _microphone_audio_track_ptr->MixDesktopAudio(mixDesktopAudio);
+    } else if (_custom_audio_track_ptr) {
+        _custom_audio_track_ptr->MixDesktopAudio(mixDesktopAudio);
     }
 }
 
 void CRtcDemoV2::OnBnClickedCheckMuteAudio()
 {
-    // TODO: Add your control notification handler code here
-    if (!_rtc_room_interface) {
+    if (!_microphone_audio_track_ptr && !_custom_audio_track_ptr) {
         return;
     }
     // 静默本地音频 Track，一端仅有一路音频 Track
+    bool muteAudio = false;
     if (1 == ((CButton*)GetDlgItem(IDC_CHECK_MUTE_AUDIO))->GetCheck()) {
-        _rtc_room_interface->MuteAudio(true);
-    } else {
-        _rtc_room_interface->MuteAudio(false);
+        muteAudio = true;
     }
 
+    if (_microphone_audio_track_ptr) {
+        _microphone_audio_track_ptr->SetMuted(muteAudio);
+    } else if (_custom_audio_track_ptr) {
+        _custom_audio_track_ptr->SetMuted(muteAudio);
+    }
 }
 
 void CRtcDemoV2::OnBnClickedCheckMuteVideo()
 {
-    // TODO: Add your control notification handler code here
-    if (!_rtc_room_interface) {
-        return;
-    }
-    bool mute_flag = false;
+    bool muteVideo = false;
     if (1 == ((CButton*)GetDlgItem(IDC_CHECK_MUTE_VIDEO))->GetCheck()) {
-        mute_flag = true;
+        muteVideo = true;
     }
     // 静默或取消静默本地所有的视频 Track
     // 这里对所有的视频 Track 进行控制
     lock_guard<recursive_mutex> lck(_mutex);
-    for (auto&& itor : _local_tracks_list) {
-        if (itor->GetKind().compare("video") == 0) {
-            _rtc_room_interface->MuteVideo(itor->GetTrackId(), mute_flag);
-        }
+    if (_camera_track_ptr) {
+        _camera_track_ptr->SetMuted(muteVideo);
+    }
+
+    if (_screen_track_ptr) {
+        _screen_track_ptr->SetMuted(muteVideo);
+    }
+
+    if (_custom_video_track_ptr) {
+        _custom_video_track_ptr->SetMuted(muteVideo);
     }
 }
 
@@ -2407,29 +1804,21 @@ void CRtcDemoV2::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
     lock_guard<recursive_mutex> lck(_mutex);
     if (pScrollBar->GetDlgCtrlID() == IDC_SLIDER_RECORD) {
         int pos = ((CSliderCtrl*)GetDlgItem(IDC_SLIDER_RECORD))->GetPos();
-        if (_rtc_audio_interface) {
-            // 调整 SDK 内部音量
-            _rtc_audio_interface->SetAudioVolume(
-                unicode2utf(_user_id.GetBuffer()),
-                pos / 100.0f
-            );
+        if (_microphone_audio_track_ptr) {
+            _microphone_audio_track_ptr->SetVolume(pos / 100.0f);
+        } else if (_custom_audio_track_ptr) {
+            _custom_audio_track_ptr->SetVolume(pos / 100.0f);
         }
     } else if (pScrollBar->GetDlgCtrlID() == IDC_SLIDER_PLAYOUT) {
         int pos = ((CSliderCtrl*)GetDlgItem(IDC_SLIDER_PLAYOUT))->GetPos();
-
-        if (_rtc_audio_interface) {
-            // 调整所有用户的音量（这里只是为了方便演示，实际可根据需要控制指定用户的音量）
-            for (auto&& itor : _user_list) {
-                if (itor.compare(unicode2utf(_user_id.GetBuffer())) != 0) {
-                    _rtc_audio_interface->SetAudioVolume(
-                        itor,
-                        pos / 100.0f
-                    );
-                }
+        RemoteUserList remoteList = _rtc_client_ptr->GetRemoteUsers();
+        for (auto&& itor : remoteList) {
+            for (auto && audio_itor : itor.remote_audio_tracks) {
+                audio_itor->SetVolume(pos / 100.0f);
             }
         }
     }
-
+    
     __super::OnHScroll(nSBCode, nPos, pScrollBar);
     __super::OnHScroll(nSBCode, nPos, pScrollBar);
 }
@@ -2438,7 +1827,7 @@ void CRtcDemoV2::OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar)
 void CRtcDemoV2::OnCbnSelchangeComboMicrophone()
 {
     // 输入音频设备配置
-    if (!_rtc_audio_interface) {
+    if (!_rtc_client_ptr) {
         return;
     }
     int audio_recorder_device_index(-1);
@@ -2446,19 +1835,21 @@ void CRtcDemoV2::OnCbnSelchangeComboMicrophone()
     audio_recorder_device_index = (audio_recorder_device_index == CB_ERR) ? 0 : audio_recorder_device_index;
 
     if (audio_recorder_device_index >= 0) {
-        qiniu_v2::AudioDeviceInfo dev_info = _microphone_dev_map[audio_recorder_device_index];
+        qiniu::QNAudioDeviceInfo dev_info = _microphone_dev_map[audio_recorder_device_index];
 
-        qiniu_v2::AudioDeviceSetting audio_setting;
+        qiniu::QNAudioDeviceSetting audio_setting;
         audio_setting.device_index = dev_info.device_index;
-        audio_setting.device_type = qiniu_v2::AudioDeviceSetting::wdt_DefaultDevice;
-        _rtc_audio_interface->SetRecordingDevice(audio_setting);
+        audio_setting.device_type = qiniu::QNAudioDeviceSetting::wdt_DefaultDevice;
+        if (_rtc_client_ptr) {
+            _rtc_client_ptr->SetRecordingDevice(audio_setting);
+        }
     }
 }
 
 void CRtcDemoV2::OnCbnSelchangeComboPlayout()
 {
     // 播放音频设备配置
-    if (!_rtc_audio_interface) {
+    if (!_rtc_client_ptr) {
         return;
     }
     int audio_playout_device_index(-1);
@@ -2466,12 +1857,12 @@ void CRtcDemoV2::OnCbnSelchangeComboPlayout()
     audio_playout_device_index = (audio_playout_device_index == CB_ERR) ? 0 : audio_playout_device_index;
 
     if (audio_playout_device_index >= 0) {
-        qiniu_v2::AudioDeviceInfo dev_info = _playout_dev_map[audio_playout_device_index];
+        qiniu::QNAudioDeviceInfo dev_info = _playout_dev_map[audio_playout_device_index];
         
-        qiniu_v2::AudioDeviceSetting audio_setting;
+        qiniu::QNAudioDeviceSetting audio_setting;
         audio_setting.device_index = dev_info.device_index;
-        audio_setting.device_type = qiniu_v2::AudioDeviceSetting::wdt_DefaultDevice;
-        _rtc_audio_interface->SetPlayoutDevice(audio_setting);
+        audio_setting.device_type = qiniu::QNAudioDeviceSetting::wdt_DefaultDevice;
+        _rtc_client_ptr->SetPlayoutDevice(audio_setting);
     }
 }
 
@@ -2484,14 +1875,14 @@ afx_msg LRESULT CRtcDemoV2::OnHandleMessage(WPARAM wParam, LPARAM lParam)
 
 afx_msg LRESULT CRtcDemoV2::OnSendMessage(WPARAM wParam, LPARAM lParam)
 {
-    if (_rtc_room_interface) {
+    if (_rtc_client_ptr) {
         LPTSTR lpMessage = (LPTSTR)lParam;
         _bstr_t bstr("");
         LPTSTR strTmp = lpMessage;
         bstr = strTmp;
         std::string strMsg = bstr;
         list<string> users_list;
-        _rtc_room_interface->SendCustomMessage(users_list, "", string_to_utf8(strMsg));
+        _rtc_client_ptr->SendCustomMessage(users_list, "", string_to_utf8(strMsg));
     }
     return 0;
 }
@@ -2515,31 +1906,35 @@ void CRtcDemoV2::OnCbnSelchangeComboLocalRotate()
 {
     // TODO: 在此添加控件通知处理程序代码
     int rotation_sel = ((CComboBox*)GetDlgItem(IDC_COMBO_LOCAL_ROTATION))->GetCurSel();
-    qiniu_v2::VideoRotation video_rotation = qiniu_v2::VideoRotation::kVideoRotation_0;
+    qiniu::QNVideoRotation video_rotation = qiniu::QNVideoRotation::kVideoRotation_0;
     switch (rotation_sel)
     {
     case 0:
-        video_rotation = qiniu_v2::VideoRotation::kVideoRotation_0;
+        video_rotation = qiniu::QNVideoRotation::kVideoRotation_0;
         break;
     case 1:
-        video_rotation = qiniu_v2::VideoRotation::kVideoRotation_90;
+        video_rotation = qiniu::QNVideoRotation::kVideoRotation_90;
         break;
     case 2:
-        video_rotation = qiniu_v2::VideoRotation::kVideoRotation_180;
+        video_rotation = qiniu::QNVideoRotation::kVideoRotation_180;
         break;
     case 3:
-        video_rotation = qiniu_v2::VideoRotation::kVideoRotation_270;
+        video_rotation = qiniu::QNVideoRotation::kVideoRotation_270;
         break;
     default:
         break;
     }
 
-    for (auto&& itor : _local_tracks_list) {
-        if (itor->GetKind().compare("video") == 0) {
-            if (_rtc_video_interface) {
-                _rtc_video_interface->SetVideoRotation(itor->GetTrackId(), video_rotation);
-            }
-        }
+    if (_camera_track_ptr) {
+        _camera_track_ptr->SetVideoRotation(video_rotation);
+    }
+
+    if (_screen_track_ptr) {
+        _screen_track_ptr->SetVideoRotation(video_rotation);
+    }
+
+    if (_custom_video_track_ptr) {
+        _custom_video_track_ptr->SetVideoRotation(video_rotation);
     }
 }
 
@@ -2548,49 +1943,46 @@ void CRtcDemoV2::OnCbnSelchangeComboRemoteRotate()
 {
     // TODO: 在此添加控件通知处理程序代码
     int rotation_sel = ((CComboBox*)GetDlgItem(IDC_COMBO_REMOTE_ROTATION))->GetCurSel();
-    qiniu_v2::VideoRotation video_rotation = qiniu_v2::VideoRotation::kVideoRotation_0;
+    qiniu::QNVideoRotation video_rotation = qiniu::QNVideoRotation::kVideoRotation_0;
     switch (rotation_sel)
     {
     case 0:
-        video_rotation = qiniu_v2::VideoRotation::kVideoRotation_0;
+        video_rotation = qiniu::QNVideoRotation::kVideoRotation_0;
         break;
     case 1:
-        video_rotation = qiniu_v2::VideoRotation::kVideoRotation_90;
+        video_rotation = qiniu::QNVideoRotation::kVideoRotation_90;
         break;
     case 2:
-        video_rotation = qiniu_v2::VideoRotation::kVideoRotation_180;
+        video_rotation = qiniu::QNVideoRotation::kVideoRotation_180;
         break;
     case 3:
-        video_rotation = qiniu_v2::VideoRotation::kVideoRotation_270;
+        video_rotation = qiniu::QNVideoRotation::kVideoRotation_270;
         break;
     default:
         break;
     }
-
-    for (auto&& itor : _remote_tracks_map) {
-        if (itor.second->track_info_ptr->GetKind().compare("video") == 0) {
-            if (_rtc_video_interface) {
-                _rtc_video_interface->SetVideoRotation(itor.first, video_rotation);
-            }
+    RemoteUserList remoteList = _rtc_client_ptr->GetRemoteUsers();
+    for (auto&& itor : remoteList) {
+        for (auto && video_itor : itor.remote_video_tracks) {
+            video_itor->SetVideoRotation(video_rotation);
         }
     }
 }
 
 void CRtcDemoV2::OnCbnSelchangeComboSubscribeProfile()
 {
-    // TODO: 在此添加控件通知处理程序代码
     int profile_sel = ((CComboBox*)GetDlgItem(IDC_COMBO_SUBSCRIBE_PROFILE))->GetCurSel();
-    qiniu_v2::QNTrackProfile video_profile = qiniu_v2::QNTrackProfile::HIGH;
+    qiniu::QNTrackProfile video_profile = qiniu::QNTrackProfile::HIGH;
     switch (profile_sel)
     {
     case 0:
-        video_profile = qiniu_v2::QNTrackProfile::HIGH;
+        video_profile = qiniu::QNTrackProfile::HIGH;
         break;
     case 1:
-        video_profile = qiniu_v2::QNTrackProfile::MEDIUM;
+        video_profile = qiniu::QNTrackProfile::MEDIUM;
         break;
     case 2:
-        video_profile = qiniu_v2::QNTrackProfile::LOW;
+        video_profile = qiniu::QNTrackProfile::LOW;
         break;
     default:
         break;
@@ -2599,32 +1991,28 @@ void CRtcDemoV2::OnCbnSelchangeComboSubscribeProfile()
     // 这里只是演示时是将所有订阅流一起切成设置的 profile，用户实际根据自己需求，更改相应track的profile，
     // 想要切换成哪种 profile，只要将对应的 mChooseToSub 设置为 true。
     lock_guard<recursive_mutex> lck(_mutex);
-    qiniu_v2::TrackInfoList sub_tracks_list;
+    RemoteUserList remoteList;
+    if (_rtc_client_ptr) {
+        remoteList = _rtc_client_ptr->GetRemoteUsers();
+    }
 
-    for (auto&& itor : _remote_tracks_map) {
-        if (itor.second->track_info_ptr->GetKind().compare("video") == 0) {
-            auto tmp_track_ptr = qiniu_v2::QNTrackInfo::Copy(itor.second->track_info_ptr);
-            for (auto&& layer_itor : tmp_track_ptr->GetLayerInfo()) {
-                if (layer_itor.mProfile == video_profile) {
-                    layer_itor.mChooseToSub = true;
-                }
+    for (auto&& itor : remoteList) {
+        for (auto && video_itor : itor.remote_video_tracks) {
+            if (video_itor->IsMultiProfileEnabled()) {
+                video_itor->SetProfile(video_profile);
             }
-            sub_tracks_list.emplace_back(tmp_track_ptr);
         }
     }
-    _rtc_room_interface->UpdateSubscribeTracks(sub_tracks_list);
 }
 
 void CRtcDemoV2::OnBnClickedButtonSimulcast()
 {
-    // TODO: 在此添加控件通知处理程序代码
     CString btn_str;
     GetDlgItemText(IDC_BUTTON_SIMULCAST, btn_str);
     if (btn_str.CompareNoCase(_T("开启多流")) == 0) {
         SetDlgItemText(IDC_BUTTON_SIMULCAST, _T("关闭多流"));
         _enable_simulcast = true;
-    }
-    else {
+    } else {
         SetDlgItemText(IDC_BUTTON_SIMULCAST, _T("开启多流"));
         _enable_simulcast = false;
     }
@@ -2633,76 +2021,56 @@ void CRtcDemoV2::OnBnClickedButtonSimulcast()
 
 void CRtcDemoV2::OnBnClickedButtonForward()
 {
-    // TODO: 在此添加控件通知处理程序代码
     CString btn_str;
+    _custom_forward_id = "window-forward";
+    qiniu::QNDirectLiveStreamingConfig forwardInfo;
+    forwardInfo.is_internal = true;
+    forwardInfo.stream_id = _custom_forward_id;
+    forwardInfo.publish_url = "rtmp://pili-publish.qnsdk.com/sdk-live/window-forward";
     GetDlgItemText(IDC_BUTTON_FORWARD, btn_str);
-    // 登录房间
+    if (_camera_track_ptr) {
+        forwardInfo.local_video_track = _camera_track_ptr->GetTrackID();
+    }
+    if (_microphone_audio_track_ptr) {
+        forwardInfo.local_audio_track = _microphone_audio_track_ptr->GetTrackID();
+    }
     if (btn_str.CompareNoCase(_T("单流转推")) == 0) {
         SetDlgItemText(IDC_BUTTON_FORWARD, _T("停止单流转推"));
-        _custom_forward_id = "window-forward";
-        qiniu_v2::ForwardOptInfo forwardInfo;
-        forwardInfo.audio_only = false;
-        forwardInfo.is_internal = true;
-        forwardInfo.job_id = _custom_forward_id;
-        forwardInfo.publish_url = "rtmp://pili-publish.qnsdk.com/sdk-live/window-forward";
-        _forward_audio_flag = false;
-        _forward_video_flag = false;
-        for (auto&& itor : _local_tracks_list) {
-            if (itor->GetKind().compare("audio") == 0 && !_forward_audio_flag) {
-                _forward_audio_flag = true;
-                forwardInfo.track_id_list.emplace_back(itor->GetTrackId());
-            }
-            if (itor->GetKind().compare("video") == 0 && !_forward_video_flag) {
-                _forward_video_flag = true;
-                forwardInfo.track_id_list.emplace_back(itor->GetTrackId());
-            }
-        }
-        if (_rtc_room_interface) {
-            _rtc_room_interface->CreateForwardJob(forwardInfo);
-            _contain_forward_flag = true;
+        if (_rtc_client_ptr) {
+            _rtc_client_ptr->StartLiveStreaming(forwardInfo);
         }
     } else {
         SetDlgItemText(IDC_BUTTON_FORWARD, _T("单流转推"));
-        if (_rtc_room_interface) {
-            _rtc_room_interface->StopForwardJob(_custom_forward_id, 0);
+        if (_rtc_client_ptr) {
+            _rtc_client_ptr->StopLiveStreaming(forwardInfo);
             _contain_forward_flag = false;
         }
     }
 }
 
-
-void CRtcDemoV2::OnBnClickedButtonExtraData()
-{
-    // TODO: 在此添加控件通知处理程序代码IDC_BUTTON_EXTRA_DATA
-    CString btn_str;
-    GetDlgItemText(IDC_BUTTON_EXTRA_DATA, btn_str);
-    if (btn_str.CompareNoCase(_T("关闭数据加解密")) == 0) {
-        SetDlgItemText(IDC_BUTTON_EXTRA_DATA, _T("开启数据加解密"));
-        _enable_encryptor_decryptor = false;
-    } else {
-        _rtc_audio_interface->EnableLocalAudioPacketCallBack(true);
-        _rtc_audio_interface->EnableRemoteAudioPacketCallBack(true);
-        SetDlgItemText(IDC_BUTTON_EXTRA_DATA, _T("关闭数据加解密"));
-        _enable_encryptor_decryptor = true;
-    }
-}
-
-
 void CRtcDemoV2::OnBnClickedCheckCameraImage()
 {
+    if (!_camera_track_ptr) {
+        return;
+    }
+
     if (1 == ((CButton*)GetDlgItem(IDC_CHECK_CAMERA_IMAGE))->GetCheck()) {
-        _rtc_video_interface->PushCameraTrackWithImage("pause_publish.jpeg");
-    } else {
-        _rtc_video_interface->PushCameraTrackWithImage("");
+        _camera_track_ptr->PushImage("pause_publish.jpeg");
+    }  else {
+        _camera_track_ptr->PushImage("");
     }
 }
 
 void CRtcDemoV2::OnBnClickedCheckCameraMirror()
 {
+    if (!_camera_track_ptr) {
+        return;
+    }
+
     if (1 == ((CButton*)GetDlgItem(IDC_CHECK_CAMERA_MIRROR))->GetCheck()) {
-        _rtc_video_interface->CameraCaptureMirror(true);
+        _camera_track_ptr->SetCaptureMirror(true);
     } else {
-        _rtc_video_interface->CameraCaptureMirror(false);
+        _camera_track_ptr->SetCaptureMirror(false);
     }
 }
 
@@ -2710,21 +2078,350 @@ void CRtcDemoV2::OnBnClickedBtnSei()
 {
     CString btn_str;
     GetDlgItemText(IDC_BTN_SEI, btn_str);
-    list<string> tracks_id_list;
-    for (auto&& itor : _local_tracks_list) {
-        if (itor->GetKind().compare("video") == 0) {
-            tracks_id_list.emplace_back(itor->GetTrackId());
+    string uuid = "\x14\x16\x17\x18\x14\x16\x17\x28\x14\x16\x17\x38\x14\x16\x17\x58";
+    if (btn_str.CompareNoCase(_T("开启SEI")) == 0) {
+        SetDlgItemText(IDC_BTN_SEI, _T("关闭SEI"));
+        if (_camera_track_ptr) {
+            _camera_track_ptr->SendSEI(string_to_utf8("七牛SEI" + std::to_string(rand())), -1, uuid);
+        }
+        if (_screen_track_ptr) {
+            _screen_track_ptr->SendSEI(string_to_utf8("七牛SEI" + std::to_string(rand())), -1, uuid);
+        }
+        if (_custom_video_track_ptr) {
+            _custom_video_track_ptr->SendSEI(string_to_utf8("七牛SEI" + std::to_string(rand())), -1, uuid);
+        }
+    } else {
+        SetDlgItemText(IDC_BTN_SEI, _T("开启SEI"));
+        if (_camera_track_ptr) {
+            _camera_track_ptr->SendSEI(string_to_utf8("七牛SEI" + std::to_string(rand())), 0, uuid);
+        }
+        if (_screen_track_ptr) {
+            _screen_track_ptr->SendSEI(string_to_utf8("七牛SEI" + std::to_string(rand())), 0, uuid);
+        }
+        if (_custom_video_track_ptr) {
+            _custom_video_track_ptr->SendSEI(string_to_utf8("七牛SEI" + std::to_string(rand())), 0, uuid);
         }
     }
 
-    if (tracks_id_list.size() != 0) {
-        string uuid = "\x14\x16\x17\x18\x14\x16\x17\x28\x14\x16\x17\x38\x14\x16\x17\x58";
-        if (btn_str.CompareNoCase(_T("开启SEI")) == 0) {
-            SetDlgItemText(IDC_BTN_SEI, _T("关闭SEI"));
-            _rtc_video_interface->SetLocalVideoSei(tracks_id_list, string_to_utf8("七牛SEI" + std::to_string(rand())), uuid , -1);
-        } else {
-            SetDlgItemText(IDC_BTN_SEI, _T("开启SEI"));
-            _rtc_video_interface->SetLocalVideoSei(tracks_id_list, "", uuid, 0);
+}
+
+
+
+
+void CRtcDemoV2::OnBnClickedCheckLocalMirror()
+{
+    bool mirror_flag = false;
+    if (1 == ((CButton*)GetDlgItem(IDC_CHECK_LOCAL_MIRROR))->GetCheck()) {
+        mirror_flag = true;
+    } else {
+        mirror_flag = false;
+    }
+
+    if (_camera_track_ptr) {
+        _camera_track_ptr->SetRenderMirror(mirror_flag);
+    }
+
+    if (_screen_track_ptr) {
+        _screen_track_ptr->SetRenderMirror(mirror_flag);
+    }
+
+    if (_custom_video_track_ptr) {
+        _custom_video_track_ptr->SetRenderMirror(mirror_flag);
+    }
+}
+
+
+void CRtcDemoV2::OnBnClickedCheckRemoteMirror()
+{
+    bool mirror_flag = false;
+    if (1 == ((CButton*)GetDlgItem(IDC_CHECK_REMOTE_MIRROR))->GetCheck()) {
+        mirror_flag = true;
+    } else {
+        mirror_flag = false;
+    }
+    RemoteUserList remoteList = _rtc_client_ptr->GetRemoteUsers();
+    for (auto&& itor : remoteList) {
+        for (auto && video_itor : itor.remote_video_tracks) {
+            video_itor->SetRenderMirror(mirror_flag);
         }
+    }
+}
+
+void CRtcDemoV2::OnCbnSelchangeComboLocalStretchMode()
+{
+    qiniu::QNStretchMode stretch_mode = ASPECT_FIT;
+    int clip_crop_source = ((CComboBox*)GetDlgItem(IDC_COMBO_LOCAL_STRETCH_MODE))->GetCurSel();
+    if (clip_crop_source == 0) {
+        stretch_mode = ASPECT_FIT;
+    } else if(clip_crop_source == 1){
+        stretch_mode = ASPECT_FILL;
+    } else {
+        stretch_mode = SCALE_TO_FIT;
+    }
+
+    if (_camera_track_ptr) {
+        _camera_track_ptr->SetStretchMode(stretch_mode);
+    }
+
+    if (_screen_track_ptr) {
+        _screen_track_ptr->SetStretchMode(stretch_mode);
+    }
+
+    if (_custom_video_track_ptr) {
+        _custom_video_track_ptr->SetStretchMode(stretch_mode);
+    }
+}
+
+void CRtcDemoV2::OnCbnSelchangeComboRemoteStretchMode()
+{
+    qiniu::QNStretchMode stretch_mode = ASPECT_FIT;
+    int clip_crop_source = ((CComboBox*)GetDlgItem(IDC_COMBO_REMOTE_STRETCH_MODE))->GetCurSel();
+    if (clip_crop_source == 0) {
+        stretch_mode = ASPECT_FIT;
+    } else if (clip_crop_source == 1) {
+        stretch_mode = ASPECT_FILL;
+    } else {
+        stretch_mode = SCALE_TO_FIT;
+    }
+
+    RemoteUserList remoteList = _rtc_client_ptr->GetRemoteUsers();
+    for (auto&& itor : remoteList) {
+        for (auto && video_itor : itor.remote_video_tracks) {
+            video_itor->SetStretchMode(stretch_mode);
+        }
+    }
+}
+
+
+void CRtcDemoV2::OnBnClickedCheckClip()
+{
+    int clip_crop_source = ((CComboBox*)GetDlgItem(IDC_COMBO_CLIP_CROP))->GetCurSel();
+    qiniu::QNTrackSourceType  src_capturer_source;
+    if (clip_crop_source == 0) {
+        src_capturer_source = qiniu::tst_Camera;
+    } else {
+        src_capturer_source = qiniu::tst_ExternalYUV;
+    }
+    int cropX = GetDlgItemInt(IDC_EDIT_CLIP_X, NULL, 0);
+    int cropY = GetDlgItemInt(IDC_EDIT_CLIP_Y, NULL, 0);
+    int width = GetDlgItemInt(IDC_EDIT_CLIP_WIDTH, NULL, 0);
+    int height = GetDlgItemInt(IDC_EDIT_CLIP_HEIGHT, NULL, 0);
+    bool flag = false;
+    if (1 == ((CButton*)GetDlgItem(IDC_CHECK_CLIP))->GetCheck()) {
+        flag = true;
+    } else {
+        flag = false;
+        cropX = 0;
+        cropY = 0;
+        width = 0;
+        height = 0;
+    }
+
+    if (src_capturer_source == qiniu::tst_Camera) {
+        if (_camera_track_ptr) {
+            _camera_track_ptr->CropAndScaleRawPicture(qiniu::p_Crop, flag, cropX, cropY, width, height);
+        }
+    }
+    else if (src_capturer_source == qiniu::tst_ExternalYUV) {
+        if (_custom_video_track_ptr) {
+            _custom_video_track_ptr->CropAndScaleRawPicture(qiniu::p_Crop, flag, cropX, cropY, width, height);
+        }
+    }
+}
+
+
+void CRtcDemoV2::OnBnClickedCheckScale()
+{
+    int clip_crop_source = ((CComboBox*)GetDlgItem(IDC_COMBO_CLIP_CROP))->GetCurSel();
+    qiniu::QNTrackSourceType  src_capturer_source;
+    if (clip_crop_source == 0) {
+        src_capturer_source = qiniu::tst_Camera;
+    } else {
+        src_capturer_source = qiniu::tst_ExternalYUV;
+    }
+
+
+    int width = GetDlgItemInt(IDC_EDIT_SCALE_WIDTH, NULL, 0);
+    int height = GetDlgItemInt(IDC_EDIT_SCALE_HEIGHT, NULL, 0);
+    bool flag = false;
+    if (1 == ((CButton*)GetDlgItem(IDC_CHECK_SCALE))->GetCheck()) {
+        flag = true;
+    } else {
+        flag = false;
+        width = 0;
+        height = 0;
+    }
+
+    if (src_capturer_source == qiniu::tst_Camera) {
+        if (_camera_track_ptr) {
+            _camera_track_ptr->CropAndScaleRawPicture(qiniu::p_Scale, flag, 0, 0, width, height);
+        }
+    }
+    else if (src_capturer_source == qiniu::tst_ExternalYUV) {
+        if (_custom_video_track_ptr) {
+            _custom_video_track_ptr->CropAndScaleRawPicture(qiniu::p_Scale, flag, 0, 0, width, height);
+        }
+    }
+}
+
+
+void CRtcDemoV2::OnBnClickedCheckMerge()
+{
+    AdjustMergeStreamLayouts();
+}
+
+
+void CRtcDemoV2::OnBnClickedCheckImportStats()
+{
+    if (!_rtc_client_ptr) {
+        return;
+    }
+    _stop_stats_flag = true;
+    if (_stats_thread.joinable()) {
+        _stats_thread.join();
+    }
+    
+
+    if (1 == ((CButton*)GetDlgItem(IDC_CHECK_IMPORT_STATS))->GetCheck()) {
+        if (!_stats_pDig ){
+            _stats_pDig = new  StatsDialog;
+            _stats_pDig->Create(IDD_DIALOG_STATS);
+            AdjustStatsLayouts();
+            _stats_pDig->ShowWindow(SW_SHOWNORMAL);
+        }
+        _stop_stats_flag = false;
+        _stats_thread = thread([&] {
+            while (!_stop_stats_flag) {
+                QNLocalAudioTrackStats local_audio_stats = _rtc_client_ptr->GetLocalAudioTrackStats();
+                if (local_audio_stats.uplinkBitrate != 0) {
+                    wchar_t dest_buf[1024] = { 0 };
+                    _snwprintf(dest_buf,
+                        sizeof(dest_buf),
+                        _T("[发布]TrackId:%s, 码率:%d kbps ,丢包率:%d, rtt:%d"),
+                        utf2unicode(local_audio_stats.trackId).c_str(),
+                        local_audio_stats.uplinkBitrate,
+                        local_audio_stats.uplinkLostRate,
+                        local_audio_stats.uplinkRTT
+                    );
+                    if (_stats_pDig) {
+                        _stats_pDig->OnReceiveStatsText(unicode2utf(dest_buf));
+                    }
+                }
+
+                QNLocalVideoStatsList local_video_statslist = _rtc_client_ptr->GetLocalVideoTrackStats();
+                for (auto itor : local_video_statslist) {
+                    string profile = "";
+                    if (itor.profile == HIGH) {
+                        profile = "high";
+                    } else if (itor.profile == MEDIUM) {
+                        profile = "medium";
+                    } else if (itor.profile == LOW) {
+                        profile = "low";
+                    }
+                    if (itor.uplinkBitrate != 0) {
+                        wchar_t dest_buf[1024] = { 0 };
+                        _snwprintf(dest_buf,
+                            sizeof(dest_buf),
+                            _T("[发布]TrackId:%s, 帧率:%d ,码率:%d kbps, 丢包率:%d, rtt:%d, profile:%s, 分辨率:%d*%d"),
+                            utf2unicode(itor.trackId).c_str(),
+                            itor.uplinkFrameRate,
+                            itor.uplinkBitrate,
+                            itor.uplinkLostRate,
+                            itor.uplinkRTT,
+                            utf2unicode(profile).c_str(),
+                            itor.width,
+                            itor.height
+                        );
+                        if (_stats_pDig) {
+                            _stats_pDig->OnReceiveStatsText(unicode2utf(dest_buf));
+                        }
+                    }
+                }
+                QNRemoteAudioTrackStats remote_audio_stats = _rtc_client_ptr->GetRemoteAudioTrackStats();
+                if (remote_audio_stats.downlinkBitrate != 0) {
+                    wchar_t dest_buf[1024] = { 0 };
+                    _snwprintf(dest_buf,
+                        sizeof(dest_buf),
+                        _T("[订阅]TrackId:%s, 码率:%d kbps ,丢包率:%d"),
+                        utf2unicode(remote_audio_stats.trackId).c_str(),
+                        remote_audio_stats.downlinkBitrate,
+                        remote_audio_stats.downlinkLostRate
+                    );
+                    if (_stats_pDig) {
+                        _stats_pDig->OnReceiveStatsText(unicode2utf(dest_buf));
+                    }
+                }
+
+                QNRemoteVideoStatsList remote_video_statslist = _rtc_client_ptr->GetRemoteVideoTrackStats();
+                for (auto itor : remote_video_statslist) {
+                    string profile = "";
+                    if (itor.profile == HIGH) {
+                        profile = "high";
+                    } else if (itor.profile == MEDIUM) {
+                        profile = "medium";
+                    } else if (itor.profile == LOW) {
+                        profile = "low";
+                    }
+                    if (itor.downlinkBitrate != 0) {
+                        wchar_t dest_buf[1024] = { 0 };
+                        _snwprintf(dest_buf,
+                            sizeof(dest_buf),
+                            _T("[订阅]TrackId:%s, 帧率:%d ,码率:%d kbps, 丢包率:%d, profile:%s, 分辨率:%d*%d"),
+                            utf2unicode(itor.trackId).c_str(),
+                            itor.downlinkFrameRate,
+                            itor.downlinkBitrate,
+                            itor.downlinkLostRate,
+                            utf2unicode(profile).c_str(),
+                            itor.width,
+                            itor.height
+                        );
+                        if (_stats_pDig) {
+                            _stats_pDig->OnReceiveStatsText(unicode2utf(dest_buf));
+                        }
+                    }
+                }
+                Sleep(1000);
+            }
+        });
+    } else {
+        _stop_stats_flag = true;
+        if (_stats_pDig) {
+            _stats_pDig->DestroyWindow();
+            delete _stats_pDig;
+            _stats_pDig = nullptr;
+        }
+    }
+}
+
+void CRtcDemoV2::OnBnClickedCheckHardEncoder()
+{
+    if (1 == ((CButton*)GetDlgItem(IDC_CHECK_HARD_ENCODER))->GetCheck()) {
+        qiniu::QNEncoderCapability encode_cap_info = _rtc_client_ptr->GetSupportEncoder();
+        qiniu::QNVideoEncodeType hw_type = qiniu::kEncodeNvenc;
+        for (auto itor : encode_cap_info.capability_vec) {
+            if (itor == hw_type) {
+                _rtc_client_ptr->SetVideoEncoder(hw_type);
+            }
+        }
+    } else {
+        _rtc_client_ptr->SetVideoEncoder(kEncodedefault);
+    }
+}
+
+void CRtcDemoV2::OnBnClickedBtnKickout()
+{
+    int index = _user_list_ctrl.GetSelectionMark();
+    if (index == -1) {
+        MessageBox(_T("请选中要踢出的用户！"));
+        return;
+    }
+    // 所选择的用户当前没有发布媒体流
+    CString user_id = _user_list_ctrl.GetItemText(index, 0);
+    if (_user_id.Compare(user_id) == 0) {
+        MessageBox(_T("不允许踢出自己！"));
+        return;
+    }
+    if (_rtc_client_ptr) {
+        _rtc_client_ptr->SendCustomMessage({unicode2utf(user_id.GetBuffer()).c_str()}, "", string_to_utf8("kickout"));
     }
 }

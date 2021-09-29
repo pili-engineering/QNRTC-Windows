@@ -16,18 +16,20 @@
 #include <condition_variable>
 #include <chrono>
 #include <map>
-#include "QNVideoInterface.h"
-#include "QNAudioInterface.h"
+#include "QNTrackInterface.h"
+#include "QNRTCClientInterface.h"
+#include "QNRTCInterface.h"
 #include "CVdieoRenderWnd.h"
 #include "resource.h"
 #include "MergeDialog.h"
 #include "MessageDialog.h"
+#include "StatsDialog.h"
 
 using namespace std;
-
+using namespace qiniu;
 class TrackInfoUI {
 public:
-    TrackInfoUI(CWnd* parent_, qiniu_v2::QNTrackInfo* track_info_)
+    TrackInfoUI(CWnd* parent_, shared_ptr<QNRemoteTrack> track_info_)
         : track_info_ptr(track_info_)
     {
         if (track_info_->GetKind().compare("audio") != 0) {
@@ -36,8 +38,8 @@ public:
                 IDD_DIALOG_FULL,
                 parent_
             )) {
-                string wnd_title = track_info_->GetUserId() + "_" 
-                    + track_info_->GetTrackId() + "_" + track_info_->GetTag();
+                string wnd_title = track_info_->GetUserID() + "_" 
+                    + track_info_->GetTrackID() + "_" + track_info_->GetTag();
                 render_wnd_ptr->SetWindowTextW(utf2unicode(wnd_title).c_str());
 
                 // 禁用最小化按钮
@@ -63,7 +65,7 @@ public:
 
 public:
     CVdieoRenderWnd * render_wnd_ptr = nullptr;
-    qiniu_v2::QNTrackInfo* track_info_ptr = nullptr;
+    shared_ptr<QNRemoteTrack> track_info_ptr = nullptr;
     static UINT WINDOW_ID;
 };
 
@@ -71,9 +73,15 @@ public:
 
 class CRtcDemoV2 
     : public CDialogEx
-    , qiniu_v2::QNRoomInterface::QNRoomListener
-    , qiniu_v2::QNAudioInterface::QNAudioListener
-    , qiniu_v2::QNVideoInterface::QNVideoListener
+    , qiniu::QNLocalVideoFrameListener
+    , qiniu::QNRemoteVideoFrameListener
+    , qiniu::QNLocalAudioFrameListener
+    , qiniu::QNRemoteAudioFrameListener
+    , qiniu::QNRemoteAudioMixedFrameListener
+    , qiniu::QNTrackInfoChangedListener
+    , qiniu::QNPublishResultCallback
+    , qiniu::QNClientEventListener
+    , qiniu::QNLiveStreamingListener
 {
 	DECLARE_DYNAMIC(CRtcDemoV2)
 
@@ -104,7 +112,6 @@ public:
     afx_msg void OnBnClickedCheckAudio();
     afx_msg void OnBnClickedCheckImportRawData();
     afx_msg void OnBnClickedCheckDesktopAudio();
-    afx_msg void OnBnClickedBtnKickout();
     afx_msg void OnBnClickedCheckMuteAudio();
     afx_msg void OnBnClickedCheckMuteVideo();
     afx_msg void OnHScroll(UINT nSBCode, UINT nPos, CScrollBar* pScrollBar);
@@ -121,202 +128,120 @@ protected:
 
     void         InitUI();
 
-    std::tuple<int, int> FindBestVideoSize(const qiniu_v2::CameraCapabilityVec& camera_cap_vec_);
+    std::tuple<int, int> FindBestVideoSize(const qiniu::CameraCapabilityVec& camera_cap_vec_);
 
     void         StartPublish();
     void         StopPublish();
 
     // 数据导入线程
-    void         ImportExternalRawFrame(const string& track_id_);
+    void         ImportExternalVideoRawFrame();
+    void         ImportExternalAudioRawFrame();
 
-    void         CreateCustomMergeJob();
+    void         CreateCustomMergeJob(bool open);
     void         AdjustMergeStreamLayouts();
     void         AdjustSubscribeLayouts();
+    void         AdjustStatsLayouts();
+    void         Leave();
 
 private:
-    // 下面为 SDK 回调接口实现
-    virtual void OnJoinResult(
-        int error_code_,
-        const string& error_str_,
-        const qiniu_v2::UserInfoList& user_vec_,
-        const qiniu_v2::TrackInfoList& stream_vec_,
-        bool reconnect_flag_
+    virtual void OnLocalAudioPCMFrame(
+        const unsigned char* data,
+        int bitsPerSample,
+        int sampleRrate,
+        size_t channels,
+        size_t samplePoints
     );
 
-    virtual void OnLeave(int error_code_, const string& error_str_, const string& user_id_);
-
-    virtual void OnRoomStateChange(qiniu_v2::RoomState state_);
-
-    virtual void OnPublishTracksResult(
-        int error_code_,
-        const string& error_str_,
-        const qiniu_v2::TrackInfoList& track_info_list_
+    virtual void OnLocalVideoFrame(
+        const string& trackId,
+        const unsigned char* data,
+        int dataSize,
+        int width,
+        int height,
+        QNVideoSourceType videoType
     );
 
-    virtual void OnSubscribeTracksResult(
-        int error_code_,
-        const string& error_str_,
-        const qiniu_v2::TrackInfoList& track_info_list_
+    virtual void OnRemoteAudioFrame(
+        const string& userId,
+        const unsigned char* data,
+        int bitsPerSample,
+        int sampleRrate,
+        size_t channels,
+        size_t samplePoints
     );
 
-    virtual void OnRemoteAddTracks(
-        const qiniu_v2::TrackInfoList& track_list_
+    virtual void OnRemoteVideoFrame(
+        const std::string& userId,
+        const string& trackId,
+        const unsigned char* data,
+        int dataSize,
+        int width,
+        int height,
+        qiniu::QNVideoSourceType videoType
     );
 
-    virtual void OnRemoteDeleteTracks(
-        const list<string>& track_list_
+    virtual void OnPreviewVideoFrame(
+        const unsigned char* data,
+        int dataSize,
+        int width,
+        int height,
+        QNVideoSourceType videoType
     );
 
-    virtual void OnRemoteUserJoin(
-        const string& user_id_,
-        const string& user_data_
+    virtual void OnRemoteMixAudioPCMFrame(
+        const unsigned char* data,
+        int bitsPerSample,
+        int sampleRrate,
+        size_t channels,
+        size_t samplePoints
     );
 
-    virtual void OnRemoteUserLeave(
-        const string& user_id_,
-        int error_code_
+    virtual void OnVideoProfileChanged(const std::string& trackid, qiniu::QNTrackProfile profile);
+
+    virtual void OnVideoDeviceStateChanged(qiniu::QNVideoDeviceState deviceState, const std::string& deviceName);
+
+    virtual void OnAudioDeviceStateChanged(qiniu::QNAudioDeviceState deviceState, const std::string& deviceGuid);
+
+    virtual void OnPublished();
+    virtual void OnPublishError(int errorCode, const std::string& errorMessage);
+
+    virtual void OnConnectionStateChanged(qiniu::QNConnectionState state, const qiniu::QNConnectionDisconnectedInfo& info);
+
+    virtual void OnUserJoined(const std::string& remoteUserID, const std::string& userData);
+
+    virtual void OnUserLeft(const std::string& remoteUserID);
+
+    virtual void OnUserReconnecting(const std::string& remoteUserID);
+
+    virtual void OnUserReconnected(const std::string& remoteUserID);
+
+    virtual void OnUserPublished(const std::string& remoteUserID, const qiniu::RemoteTrackList& trackList);
+
+    virtual void OnUserUnpublished(const std::string& remoteUserID, const qiniu::RemoteTrackList& trackList);
+
+    virtual void OnSubscribed(
+        const std::string& remoteUserID,
+        const qiniu::RemoteAudioTrackList& remoteAudioTracks,
+        const qiniu::RemoteVideoTrackList& remoteVideoTracks
     );
 
-    virtual void OnKickoutResult(
-        const std::string& kicked_out_user_id_,
-        int error_code_,
-        const std::string& error_str_
-    );
+    virtual void OnMessageReceived(const qiniu::CustomMessageList& message);
 
-    virtual void OnRemoteTrackMuted(
-        const string& track_id_, 
-        bool mute_flag_
-    );
+    virtual void OnMuteStateChanged(bool isMuted, const std::string& remoteUserId, const qiniu::RemoteTrackList& trackList);
 
-    virtual void OnStatisticsUpdated(
-        const qiniu_v2::StatisticsReport& statistics_
-    );
-
-	virtual void OnReceiveMessage(
-		const qiniu_v2::CustomMessageList& custom_message_
-	);
-
-    virtual void OnRemoteUserReconnecting(const std::string& remote_user_id_);
-
-    virtual void OnRemoteUserReconnected(const std::string& remote_user_id_);
-
-    virtual void OnTrackMute(bool server_mute_flag_, bool local_mute_flag_, qiniu_v2::QNTrackInfo& trackInfo_);
-
-    virtual void OnUnPublishTracksResult(
-        const qiniu_v2::TrackInfoList& track_list_
-    );
-
-    virtual void OnRemoteStatisticsUpdated(
-        const qiniu_v2::StatisticsReportList& statistics_list_
-    );
-
-    virtual void OnCreateMergeResult(
-        const std::string& job_id_,
-        int error_code_,
-        const std::string& error_str_
-    );
-
-    virtual void OnStopMergeResult(
-        const std::string& job_id_,
-        const std::string& job_iid_,
-        int error_code_,
-        const std::string& error_str_
-    );
-
-    virtual void OnSetSubscribeTracksProfileResult(
-        int error_code_,
-        const string& error_str_,
-        const qiniu_v2::TrackInfoList& track_list_
-    );
-
-    virtual void OnCreateForwardResult(
-        const std::string& job_id_,
-        int error_code_,
-        const std::string& error_str_
-    );
-
-    virtual void OnStopForwardResult(
-        const std::string& job_id_,
-        const std::string& job_iid_,
-        int error_code_,
-        const std::string& error_str_
-    );
-
-    // 音频数据回调，本地和远端的都通过此接口
-    virtual void OnAudioPCMFrame(
-        const unsigned char* audio_data_,
-        int bits_per_sample_,
-        int sample_rate_,
-        size_t number_of_channels_,
-        size_t number_of_frames_,
-        const std::string& user_id_
-    );
-
-    // 音频设备插拔事件通知
-    virtual void OnAudioDeviceStateChanged(
-        qiniu_v2::AudioDeviceState device_state_,
-        const std::string& device_guid_
-    );
-
-    virtual int OnPutExtraData(
-        unsigned char* extra_data_,
-        int extra_data_max_size_,
-        const std::string& track_id_
-    );
-
-    virtual int OnSetMaxEncryptSize(
-        int frame_size_,
-        const std::string& track_id_
-    );
-
-    virtual int OnEncrypt(const unsigned char* frame_,
-        int frame_size_,
-        unsigned char* encrypted_frame_,
-        const std::string& track_id_
-    );
-
-    virtual void OnGetExtraData(
-        const unsigned char* extra_data_,
-        int extra_data_size_,
-        const std::string& track_id_
-    );
-
-    virtual int OnSetMaxDecryptSize(
-        int encrypted_frame_size_,
-        const std::string& track_id_
-    );
-
-    virtual int OnDecrypt(
-        const unsigned char* encrypted_frame_,
-        int encrypted_size_,
-        unsigned char* frame_,
-        const std::string& track_id_
-    );
-
-    virtual void OnVideoDeviceStateChanged(
-        qiniu_v2::VideoDeviceState device_state_, 
-        const std::string& device_name_
-    );
-    virtual void OnVideoFrame(
-        const unsigned char* raw_data_, 
-        int data_len_, 
-        int width_, 
-        int height_, 
-        qiniu_v2::VideoCaptureType video_type_, 
-        const std::string& track_id_, 
-        const std::string& user_id_
-    );
-    virtual void OnVideoFramePreview(
-        const unsigned char* raw_data_, 
-        int data_len_, 
-        int width_, 
-        int height_, 
-        qiniu_v2::VideoCaptureType video_type_
-    );
+    virtual void OnStarted(const std::string& streamID);
+    virtual void OnStopped(const std::string& streamID);
+    virtual void OnTranscodingTracksUpdated(const std::string& streamID);
+    virtual void OnError(const std::string& streamID, const QNLiveStreamingErrorInfo& errorInfo);
 
 protected:
+    QNRTCClient*                 _rtc_client_ptr = nullptr;
+    QNCameraVideoTrack*          _camera_track_ptr = nullptr;
+    QNScreenVideoTrack*          _screen_track_ptr = nullptr;
+    QNCustomVideoTrack*          _custom_video_track_ptr = nullptr;
+    QNMicrophoneAudioTrack*      _microphone_audio_track_ptr = nullptr;
+    QNCustomAudioTrack*          _custom_audio_track_ptr = nullptr;
     CWnd *                       _main_dlg_ptr        = nullptr;
-    CRichEditCtrl                _msg_rich_edit_ctrl;
     CListCtrl                    _user_list_ctrl;
     CString                      _app_id;
     CString                      _room_name;
@@ -325,32 +250,30 @@ protected:
     string                       _room_token;
     bool                         _contain_admin_flag;
     bool                         _contain_forward_flag = false;
-    qiniu_v2::QNRoomInterface*   _rtc_room_interface  = nullptr;
-    qiniu_v2::QNVideoInterface*  _rtc_video_interface = nullptr;
-    qiniu_v2::QNAudioInterface*  _rtc_audio_interface = nullptr;
     list<std::function<void()>>  _call_function_list;
     recursive_mutex              _mutex;
     chrono::time_point<chrono::steady_clock> _start_tp;
-    map<string, qiniu_v2::CameraDeviceInfo> _camera_dev_map;
-    map<int, qiniu_v2::AudioDeviceInfo>     _microphone_dev_map;
-    map<int, qiniu_v2::AudioDeviceInfo>     _playout_dev_map;
-    map<int, qiniu_v2::ScreenWindowInfo>    _screen_info_map;
-    qiniu_v2::TrackInfoList      _local_tracks_list;
-    map<string, shared_ptr<TrackInfoUI>> _remote_tracks_map;
+    map<string, qiniu::QNCameraDeviceInfo> _camera_dev_map;
+    map<int, qiniu::QNAudioDeviceInfo>     _microphone_dev_map;
+    map<int, qiniu::QNAudioDeviceInfo>     _playout_dev_map;
+    map<int, qiniu::QNScreenWindowInfo>    _screen_info_map;
     list<string>                 _user_list;
-    bool                         _stop_external_flag = false;
+    bool                         _stop_video_external_flag = true;
+    bool                         _stop_audio_external_flag = true;
     MergeDialog::MergeConfig     _merge_config;
     std::string                  _custom_merge_id;
     std::string                  _custom_forward_id;
     thread                       _fake_video_thread;
     thread                       _fake_audio_thread;
+    thread                       _stats_thread;
     MessageDialog                _dlg_msg;
     bool                         _enable_simulcast = false;
     bool                         _forward_video_flag = false;
     bool                         _forward_audio_flag = false;
-    bool                         _enable_encryptor_decryptor = false;
-    bool                         _show_extra = true;
-    qiniu_v2::TrackSourceType    _src_capturer_source = qiniu_v2::tst_Camera;
+    bool                         _stop_stats_flag = true;
+    map<string, shared_ptr<TrackInfoUI>> _remote_tracks_map;
+    LocalTrackList               _local_published_track_list;
+    StatsDialog*                 _stats_pDig = nullptr;
 public:
     afx_msg void OnBnClickedButtonSendMsg();
     afx_msg void OnCbnSelchangeComboLocalRotate();
@@ -358,8 +281,18 @@ public:
     afx_msg void OnCbnSelchangeComboSubscribeProfile();
     afx_msg void OnBnClickedButtonSimulcast();
     afx_msg void OnBnClickedButtonForward();
-    afx_msg void OnBnClickedButtonExtraData();
     afx_msg void OnBnClickedCheckCameraImage();
     afx_msg void OnBnClickedCheckCameraMirror();
     afx_msg void OnBnClickedBtnSei();
+    afx_msg void OnBnClickedCheckImportRawAudioData();
+    afx_msg void OnBnClickedCheckLocalMirror();
+    afx_msg void OnBnClickedCheckRemoteMirror();
+    afx_msg void OnCbnSelchangeComboLocalStretchMode();
+    afx_msg void OnCbnSelchangeComboRemoteStretchMode();
+    afx_msg void OnBnClickedCheckClip();
+    afx_msg void OnBnClickedCheckScale();
+    afx_msg void OnBnClickedCheckMerge();
+    afx_msg void OnBnClickedCheckImportStats();
+    afx_msg void OnBnClickedCheckHardEncoder();
+    afx_msg void OnBnClickedBtnKickout();
 };

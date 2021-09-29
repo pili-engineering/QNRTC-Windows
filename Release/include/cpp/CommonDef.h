@@ -2,8 +2,9 @@
 #include <string>
 #include <vector>
 #include <list>
+#include "QNErrorCode.h"
 
-namespace qiniu_v2 {
+namespace qiniu {
 
 #if defined _WIN32
 #ifdef __QINIU_DLL_EXPORT_ 
@@ -19,7 +20,7 @@ namespace qiniu_v2 {
 #endif
 #endif // WIN32
 
-#define QNRTC_MAX_DEVICE_LENGHT 128
+#define QNRTC_MAX_DEVICE_LENGTH 128
 
 #define VIDEO_KIND_TYPE "video"
 #define AUDIO_KIND_TYPE "audio"
@@ -35,6 +36,25 @@ namespace qiniu_v2 {
         LOG_ERROR,
     };
 
+    enum QNConnectionState
+    {
+        DISCONNECTED,
+        CONNECTING,
+        CONNECTED,
+        RECONNECTING,
+        RECONNECTED,
+    };
+
+    enum TrackState
+    {
+        _eIdle = 0,
+        _eWaiting = 1,
+        _eConnecting = 2,
+        _eConnected = 3,
+        _eDisconnecting = 4,
+        _eDisconnected = 5
+    };
+
     // 房间连接状态 
     enum RoomState
     {
@@ -45,7 +65,7 @@ namespace qiniu_v2 {
     };
 
     // Track 类型，或者可以理解为数据源类型 
-    enum TrackSourceType
+    enum QNTrackSourceType
     {
         tst_Invalid = -1,   // 无效类型 
         tst_Microphone,     // 音频数据：数据源为 SDK 内部的麦克风采集 
@@ -57,15 +77,15 @@ namespace qiniu_v2 {
     };
 
     // 媒体传输协议配置 
-    enum IcePolicy
+    enum QNIcePolicy
     {
         forceUdp  = 0,      // media transfer forced use udp
         forceTcp  = 1,      // media transfer forced use tcp
         preferUdp = 2,      // media transfer use udp first, and if udp don't work, then downgrade using tcp
     };
 
-    // 合流画面填充方式 
-    enum MergeStretchMode
+    // 画面渲染窗口填充方式 
+    enum QNStretchMode
     {
         ASPECT_INVALID = -1, // 无效值 
         ASPECT_FILL  = 0,   // 在保持长宽比的前提下，缩放视频，使其充满容器 
@@ -80,47 +100,67 @@ namespace qiniu_v2 {
         LOW,
     };
 
-    // 合流背景、水印配置参数 
-    struct MergeLayer {
-        string layer_url;       // http网络图片地址 
-        int pos_x = 0;          // 在合流画面中的x坐标 
-        int pos_y = 0;          // 在合流画面中的y坐标 
-        int layer_width = 0;    // 该图片占宽 
-        int layer_height = 0;   // 该图片占高 
-    };
-
-    typedef list<MergeLayer> MergeLayerList;
-
-    // 自定义合流配置信息 
-    struct MergeJob {
-        string job_id;              // 合流任务id，保证唯一 
-        string publish_url;         // 自定义合流推流地址 
-
-        int width = 0;              // 合流画布宽 
-        int height = 0;             // 合流画布高 
-        int fps = 0;                // 合流帧率 
-        int bitrate = 0;            // 合流码率bps 
-        int min_bitrate = 0;        // 最小码率 
-        int max_bitrate = 0;        // 最大码率 
-        bool is_hold_last_frame = false; // 合流停止时是否保持最后一帧画面 
-        MergeStretchMode stretch_mode = ASPECT_FILL;
-    };
-
-    // 旁路直播合流配置信息，通过 SDK 将参数发送到服务端 
-    // 服务端按照指定的参数进行合流并推出 RTMP 流 
-    struct MergeOptInfo
+    // 视频数据格式 
+    enum QNVideoSourceType
     {
-        string track_id;     // Track Id，房间内唯一 
-        bool   is_video;     // 是否为视频类型，如果为 false， 则以下参数无效 
-        int    pos_x;        // 此路流（即此 Track）在 RTMP 流画布中的 X 坐标 
-        int    pos_y;        // 此路流（即此 Track）在 RTMP 流画布中的 Y 坐标 
-        int    pos_z;        // 此路流（即此 Track）在 RTMP 流画布中的 Z 坐标 
-        int    width;        // 此路流（即此 Track）在 RTMP 流画布中的宽度，缩放、裁减方式根据后端配置决定 
-        int    height;       // 此路流（即此 Track）在 RTMP 流画布中的高度，缩放、裁减方式根据后端配置决定 
-        MergeStretchMode stretchMode = ASPECT_INVALID;   // 设置视频 Track 在合流时的填充模式，如果不做单独设置，
-                                                         // 填充模式将继承 CreateMergeJob 的 stretchMode 
-        bool is_support_sei = false;   // 是否支持私有 SEI 数据插入，只能设置一个 track 为 true 
+        kUnknown,
+        kI420,
+        kIYUV,
+        kRGB24,
+        kABGR,
+        kARGB,
+        kARGB4444,
+        kRGB565,
+        kARGB1555,
+        kYUY2,
+        kYV12,
+        kUYVY,
+        kMJPEG,
+        kNV21,
+        kNV12,
+        kBGRA,
+        kH264, // 目前仅针对 Linux SDK
     };
+
+    // 画面帧处理模式 
+    enum QNVideoProcessMode
+    {
+        p_None,
+        p_Crop,                  //裁剪
+        p_Scale                  //缩放
+    };
+
+    // 摄像头设备状态，SDK 提供设备插拔状态的监控，以下用于标识设备被插入还是拔出
+ // 设备状态变化后，建议通过 GetCameraCount 重新获取摄像头设备列表 
+    enum QNVideoDeviceState
+    {
+        vds_active = 0x00000001,            // 设备插入 
+        vds_lost = 0x00000002,            // 设备拔出 
+    };
+
+    // 表示原始视频数据的旋转角度，主要用于对原始视频数据进行处理的功能接口中 
+    enum QNVideoRotation
+    {
+        kVideoRotation_0 = 0,
+        kVideoRotation_90 = 90,
+        kVideoRotation_180 = 180,
+        kVideoRotation_270 = 270
+    };
+
+    struct QNConnectionDisconnectedInfo
+    {
+        enum Reason {
+            LEAVE,          // 主动退出
+            KICKED_OUT,     // 被服务器踢出房间
+            ROOM_CLOSED,    // 房间被关闭
+            ROOM_FULL,      // 房间人数已满
+            ROOM_ERROR      // 异常断开
+        };
+        Reason reason;
+        int error_code = QNRTC_OK;
+        std::string error_message = "";
+    };
+
 
     // 用户信息 
     struct UserInfo
@@ -129,41 +169,8 @@ namespace qiniu_v2 {
         string user_data;    // 用户自定义数据，在 JoinRoom 时指定，通过服务器进行透传 
     };
 
-    // 通话质量回调信息 
-    struct StatisticsReport
-    {
-        std::string track_id; // Track Id，房间内唯一 
-        std::string user_id;  // 此 track 所属 user id
-        bool        is_video; // 是否为视频 track 
-
-        // 以下两个成员为音频 track 参数，仅当 is_video 为 false 时有效 
-        int         audio_bitrate = 0;              // 音频码率，单位：bps
-        float       audio_packet_lost_rate = 0.0f;  // 音频丢包率 
-        uint64_t    audio_packets_received = 0;     // 接收到的音频媒体包数 
-        uint64_t    audio_red_packets_sent = 0;     // 发送端发送的 redundant packet 个数 
-        uint64_t    audio_packets_sent = 0;         // 音频包发送个数 
-        uint64_t    total_samples_received = 0;     // 接收到的音频 sample 个数 
-        uint64_t    concealed_samples = 0;          // 接收到的音频失效 sample 个数 
-
-        // 以下成员为视频 track 参数，仅当 is_video 为 true 时有效 
-        int         video_width = 0;                // 视频宽度 
-        int         video_height = 0;               // 视频高度 
-        int         video_frame_rate = 0;           // 视频帧率 
-        int         video_bitrate = 0;              // 码率，单位：bps
-        float       video_packet_lost_rate = 0.0f;  // 丢包率 
-        int64_t     out_rtt = 0;                    // 数据从发送到接收端的往返延迟 
-        int         network_grade;                  // 网络质量  1 - 优 2 - 良 3 - 中等 4 - 差 
-        float       video_stall_rate = 0;           // 视频卡顿率 
-        uint64_t    video_packets_received = 0;     // 接收到的视频媒体包数 
-        uint64_t    video_fec_packets_received = 0; // 接收到的视频 fec 包数 
-        uint64_t    video_packets_sent = 0;         // 视频包发送个数 
-        uint64_t    video_fec_packets_sent = 0;     // 发送端发送的 fec packet 个数 
-        uint64_t    video_total_frames_duration = 0; // 接收端接收到的视频包总时长 
-        uint64_t    video_total_freezes_duration = 0; // 接收端视频空闲时长 
-    };
-
     //自定义消息接收回调信息 
-    struct  CustomMessage
+    struct  QNCustomMessage
     {
         std::string msg_id;        // 消息唯一id 
         std::string msg_sendid;    // 消息发送者的user id 
@@ -171,220 +178,276 @@ namespace qiniu_v2 {
         int         msg_stamp;     // 消息时间戳 
     };
 
-    struct QNTrackLayerSubConfig {
-        QNTrackProfile mProfile;   // 当前 profile 
-        bool mChooseToSub;         // 是否需要切换为当前的 profile 
-        bool mMaintainLayer;       // 开启后，订阅端 profile 不会随网络自动切换 （暂时不支持） 
-        bool mActive;              // 当前 profile 为生效状态 
+    // 摄像头支持的采集能力 
+    struct QNCameraCapability
+    {
+        int                 width;
+        int                 height;
+        int                 max_fps;
+        QNVideoSourceType    video_type;
+    };
+
+    typedef std::vector<QNCameraCapability> CameraCapabilityVec;
+
+    // 摄像头设备信息 
+    struct QNCameraDeviceInfo
+    {
+        std::string         device_id;      // 设备 Id，用于系统内做标识 
+        std::string         device_name;    // 设备名，用于展示给用户，较友好 
+        CameraCapabilityVec capability_vec; // 此摄像头所支持的采集能力列表 
+    };
+
+    typedef std::vector<QNCameraDeviceInfo> CameraDeviceInfoVec;
+
+    // 摄像头预览配置，在调用 PreviewCamera 接口时使用 
+    struct QNCameraPreviewSetting
+    {
+        std::string device_id;              // 设备 Id
+        std::string device_name;            // 设备名 
+        int         width = 640;
+        int         height = 480;
+        int         max_fps = 15;
+        void*       render_hwnd = nullptr;  //video render window hwnd,MFC:HWND; QT:winId
+    };
+
+    // 窗口预览配置，在调用 PreviewCamera 接口时使用
+    struct QNScreenPreviewSetting
+    {
+        int         screen_id;              // 窗口 Id
+        void*       render_hwnd = nullptr;  //video render window hwnd,MFC:HWND; QT:winId
+    };
+
+    // SDK 提供对桌面和窗口的画面采集，以下为可以采集的屏幕或窗口信息 
+    struct QNScreenWindowInfo
+    {
+#if defined _WIN32
+#if defined _WIN64
+        long long    id;        // 窗口 Id，唯一标识 
+#else
+        int          id;
+#endif // _WIN64
+#else 
+        long long    id;
+#endif // _WIN32
+        std::string  title;     // 窗口标题 
+        bool         is_screen; // true:显示器; false:窗口 
+    };
+
+    // 当导入 H.264 裸码流时，用于封装单个 Nal 
+    // 目前仅针对 Linux SDK 有效 
+    struct H264Nal
+    {
+        unsigned char* payload = nullptr;
+        size_t payload_size = 0;
+    };
+
+    // 已编码视频帧数据 
+    struct EncodedFrame {
+        unsigned int encoded_width = 0;
+        unsigned int encoded_height = 0;
+        unsigned int time_stamp = 0;
+        long long ntp_time_ms = 0; // NTP time of the capture time in local timebase in milliseconds.
+        long long capture_time_ms = 0;
+        bool key_frame = false;
+        QNVideoRotation rotation = kVideoRotation_0;
+        unsigned char* buffer = nullptr;
+        size_t buffer_size = 0; // playload size
+    };
+
+    // 已解码视频帧数据
+    struct DecodedFrame
+    {
+        unsigned char* buffer = nullptr;
+        size_t buffer_size = 0;
+        size_t width = 0;
+        size_t height = 0;
+        unsigned long long timestamp_us = 0;
+        QNVideoRotation rotation = kVideoRotation_0;
+        QNVideoSourceType raw_type;
+    };
+
+    enum QNVideoEncodeType
+    {
+        kEncodedefault,       // 默认 Open264 编码器 
+        kEncodeQsv,           // Intel  集显编码器 
+        kEncodeNvenc,         // NVIDIA 独显编码器 
+    };
+
+    typedef std::vector<QNVideoEncodeType> EncoderCapabilityVec;
+
+    struct QNEncoderCapability
+    {
+        EncoderCapabilityVec capability_vec;
+    };
+
+    // 音频设备配置，用于指定设备进行录制或者播放 
+    struct QNAudioDeviceSetting
+    {
+        enum WindowsAudioDeviceType
+        {
+            wdt_DefaultCommunicationDevice = -1, // 通信设备 
+            wdt_DefaultDevice = -2  // 普通设备 
+        };
+        int                 device_index;                    // 设备编号；注意：0 不代表默认设备 
+        WindowsAudioDeviceType   device_type = wdt_DefaultDevice; // 设备类型，建议默认为普通设备 
+    };
+
+    // 音频设备当前状态，用与设备插拔的检测和通知 
+    enum QNAudioDeviceState
+    {
+        ads_active = 0x00000001,     // 新的可用设备 
+        ads_disabled = 0x00000002,     // 设备失效 
+        ads_notpresent = 0x00000004,     // 设备不存在 
+        ads_unplugged = 0x00000008,     // 设备被拔出 
+        ads_mask_all = 0x0000000F,
+    };
+
+    // 音频设备信息 
+    struct QNAudioDeviceInfo
+    {
+        enum QNAudioDeviceType
+        {
+            adt_invalid = -1,
+            adt_record,
+            adt_playout,
+        };
+        int device_index = 0;
+        bool is_default = false;
+        QNAudioDeviceType device_type = adt_invalid;
+        char device_name[QNRTC_MAX_DEVICE_LENGTH] = { 0 };
+        char device_id[QNRTC_MAX_DEVICE_LENGTH] = { 0 };
+
+        QNAudioDeviceInfo& operator = (const QNAudioDeviceInfo& info_)
+        {
+            device_index = info_.device_index;
+            device_type = info_.device_type;
+            is_default = info_.is_default;
+#if defined _WIN32
+            strncpy_s(device_name, info_.device_name, strlen(info_.device_name));
+            strncpy_s(device_id, info_.device_id, strlen(info_.device_id));
+#else
+            strncpy(device_name, info_.device_name, strlen(info_.device_name));
+            strncpy(device_id, info_.device_id, strlen(info_.device_id));
+#endif //WIN32
+            return *this;
+        }
     };
 
     // 单路转推配置信息，通过 SDK 将参数发送到服务端 
+    // 服务端按照指定的参数进行 CDN 转推 
+    struct QNDirectLiveStreamingConfig
+    {
+        std::string         local_audio_track = "";  // 单路转推的音频track 
+        std::string         local_video_track = "";  // 单路转推的视频track 
+        std::string         stream_id = "";          // 单路转推任务 id，由客户端设置，不可为空 
+        std::string         publish_url = "";        // rtmp 转推地址 
+        bool                is_internal = true;      // 是否使用七牛内部转推，默认为 true 
+        int                 delay_ms = 0;            // 延迟停止转推的时间
+    };
+
+    // 合流背景、水印配置参数 
+    struct QNTranscodingLiveStreamingImage {
+        std::string layer_url;  // http网络图片地址 
+        int pos_x = 0;          // 在合流画面中的x坐标 
+        int pos_y = 0;          // 在合流画面中的y坐标 
+        int layer_width = 0;    // 该图片占宽 
+        int layer_height = 0;   // 该图片占高 
+    };
+
+    typedef list<QNTranscodingLiveStreamingImage> QNTranscodingImageList;
+
+    // 自定义合流配置信息 
+    struct QNTranscodingLiveStreamingConfig
+    {
+        std::string stream_id = "";                         // 合流任务id，保证唯一 
+        std::string publish_url = "";                       // 自定义合流推流地址 
+        QNTranscodingLiveStreamingImage merge_background;   // 合流背景 
+        QNTranscodingImageList   merge_watermark;           // 合流水印配置链表 
+        int width = 0;                                      // 合流画布宽 
+        int height = 0;                                     // 合流画布高 
+        int fps = 0;                                        // 合流帧率 
+        int bitrate = 0;                                    // 合流码率bps 
+        int min_bitrate = 0;                                // 最小码率 
+        int max_bitrate = 0;                                // 最大码率 
+        bool is_hold_last_frame = false;                    // 合流停止时是否保持最后一帧画面 
+        QNStretchMode stretch_mode = ASPECT_FILL;           // 合流画面填充模式 
+        int delay_ms = 0;                                   // 延迟停止合流转推的时间
+    };
+
+    // 旁路直播合流配置信息，通过 SDK 将参数发送到服务端 
     // 服务端按照指定的参数进行合流并推出 RTMP 流 
-    struct ForwardOptInfo
+    struct QNTranscodingLiveStreamingTrack
     {
-        list<string>       track_id_list;       // 单路转推的音频和视频的 track id，audio_only 为 true 时，只存放音频的 track id 
-        bool               audio_only;          // 是否为是否只转推音频 
-        std::string        job_id;              // 单路转推任务 id，由客户端设置，不可为空，若已存在相同 id 的 job，返回错误 
-        std::string        publish_url;         // 转推地址 
-        bool               is_internal = true;  // 是否使用七牛内部转推，默认为 true 
+        std::string track_id;       // Track Id，房间内唯一 
+        bool   is_video;            // 是否为视频类型，如果为 false， 则以下参数无效 
+        int    pos_x;               // 此路流（即此 Track）在 RTMP 流画布中的 X 坐标 
+        int    pos_y;               // 此路流（即此 Track）在 RTMP 流画布中的 Y 坐标 
+        int    pos_z;               // 此路流（即此 Track）在 RTMP 流画布中的 Z 坐标 
+        int    width;               // 此路流（即此 Track）在 RTMP 流画布中的宽度，缩放、裁减方式根据后端配置决定 
+        int    height;              // 此路流（即此 Track）在 RTMP 流画布中的高度，缩放、裁减方式根据后端配置决定 
+        QNStretchMode stretchMode = ASPECT_INVALID;   // 设置视频 Track 在合流时的填充模式，如果不做单独设置，
+                                                         // 填充模式将继承 CreateMergeJob 的 stretchMode 
+        bool is_support_sei = false;   // 是否支持私有 SEI 数据插入，只支持一路 track 设置 
     };
 
-    typedef list<MergeOptInfo> MergeOptInfoList;
-    typedef list<UserInfo> UserInfoList;
-    typedef list<CustomMessage> CustomMessageList;
-    typedef list<StatisticsReport> StatisticsReportList;
-    typedef list<QNTrackLayerSubConfig> LayerSubConfigList;
-
-    class QNTrackInfo;
-    typedef list<QNTrackInfo*> TrackInfoList;
-
-    // Track 描述信息 
-    // 使用场景 1、开发者在发布时可以根据 CreateVideoTrackInfo 或 CreateAudioTrackInfo 进行构造 
-    // 使用场景 2、在各种消息回调中，SDK 向上层传递 Track 信息 
-#if defined _WIN32
-    class QINIU_EXPORT_DLL QNTrackInfo
-#else
-    class QNTrackInfo
-#endif // WIN32
+    struct QNLiveStreamingErrorInfo
     {
-    protected:
-        string track_id;                        // Track Id（数据流唯一标识） 
-        string local_id;                        // Track 在 webrtc 中的标识 
-        string user_id;                         // 此 Track 所属 User Id
-        string kind;                            // VIDEO_KIND_TYPE 或 AUDIO_KIND_TYPE
-        string tag;                             // Track 自定义 Tag，由用户指定并使用，SDK 仅做透传 
-        bool   master               = false;    // 是否为主流，默认为 false
-        bool   muted                = false;    // 是否已静默 
-        int    max_bitrate          = 0;        // 最大码率，单位：bps
-        int    state                = 0;        
-        bool   connected            = false;    // 此 track 当前是否处于已连接状态 
-        // 以下成员仅对视频 Track 有效 
-        int    width                = 0;
-        int    height               = 0;
-        int    max_fps              = 0;
-        void*  render_hwnd          = nullptr;  // 渲染窗口句柄，HWND 或 winId(),为空则不渲染，对数据回调无影响 
-        string camera_device_id;                // 摄像头设备 Id，仅当 source_type 为 tst_Camera 时有效 
-        TrackSourceType source_type = tst_Invalid;
-        unsigned long long start_tp = 0;
-        LayerSubConfigList  sub_layer_list;        // 订阅端多流信息 
-        bool   multi_stream_enable  = false;       // 是否支持开启多流功能 
-    public:
-        // 创建视频 Track 实例，用于 PublishTracks 时使用，使用完成后调用 Release 进行释放 
-        // @param camera_device_id_ 摄像头设备 Id，如果不是摄像头采集的话，可为空 
-        // @param tag_ 开发者自定义 tag
-        // @param render_hwnd_ 视频渲染窗口句柄，如：MFC 下窗口的 m_hWnd 或 Qt 下的 winId()，为 NULL 则不渲染 
-        // @param width_ 数据源宽度 
-        // @param height_ 数据源高度 
-        // @param max_fps_ 最大帧率 
-        // @param max_bitrate_ 最大码率，单位：bps
-        // @param type_ TrackSourceType 根据具体的数据源进行制定 
-        // @param is_master_ 是否为“主”流，默认为 false 
-        //  如果需要与 v1 的接口进行互通，则将其中某一路 Track 置为 true 
-        // @param multi_stream_enable_  是否开启多流功能，默认为 false； 
-        // @return 成功：TrackInfo 指针，否则返回空指针；返回值需由 Release 方法释放 
-        static QNTrackInfo* CreateVideoTrackInfo(
-            const string& camera_device_id_,
-            const string& tag_,
-            void* render_hwnd_,
-            int   width_,
-            int   height_,
-            int   max_fps_,
-            int   max_bitrate_,
-            TrackSourceType type_,
-            bool  is_master_ = false,
-            bool  multi_stream_enable_ = false
-        );
-
-        // 创建音频 Track 实例，用于 PublishTracks 时使用，返回值需由开发者调用 Release 进行释放
-        // 全局仅能创建并发布一路 Audio Track
-        // @param tag_ 开发者自定义 tag
-        // @param max_bitrate_ 最大码率，单位：bps
-        // @param is_master_ 是否为“主”流，默认为 false；
-        // 如果需要与 v1 的接口进行互通，则将其中某一路 Track 置为 true
-        // @return 成功：TrackInfo 指针，否则返回空指针；返回值需由 Release 方法释放 
-        static QNTrackInfo* CreateAudioTrackInfo(
-            const string& tag_,
-            int   max_bitrate_,
-            bool  is_master_ = false
-        );
-
-        // 释放 CreateVideoTrackInfo 或 CreateAudioTrackInfo 创建的 Track 实例 
-        void Release()
-        {
-            delete this;
-        }
-
-        // 拷贝获取一个新的 TrackInfo 实例，返回值需由开发者调用 Release 进行释放 
-        static QNTrackInfo* Copy(QNTrackInfo* track_info_);
-
-        static void ReleaseList(TrackInfoList& track_list_);
-
-    public:
-        virtual ~QNTrackInfo() {}
-
-        virtual const string& GetTrackId()
-        {
-            return track_id;
-        }
-
-        virtual const string& GetLocalId()
-        {
-            return local_id;
-        }
-
-        virtual const string& GetUserId()
-        {
-            return user_id;
-        }
-        
-        virtual const string& GetKind()
-        {
-            return kind;
-        }
-
-        virtual const string& GetTag()
-        {
-            return tag;
-        }
-
-        virtual bool IsMaster()
-        {
-            return master;
-        }
-
-        virtual bool IsMuted()
-        {
-            return muted;
-        }
-
-        virtual int GetMaxBitRate()
-        {
-            return max_bitrate;
-        }
-
-        virtual int GetState()
-        {
-            return state;
-        }
-
-        virtual bool IsConnected()
-        {
-            return connected;
-        }
-
-        virtual int GetWidth()
-        {
-            return width;
-        }
-
-        virtual int GetHeight()
-        {
-            return height;
-        }
-
-        virtual int GetMaxFps()
-        {
-            return max_fps;
-        }
-
-        virtual void* GetRenderHwnd()
-        {
-            return render_hwnd;
-        }
-
-        void SetRenderHwnd(void* hwnd_)
-        {
-            render_hwnd = hwnd_;
-        }
-
-        virtual const string& GetCameramDeviceId()
-        {
-            return camera_device_id;
-        }
-
-        virtual TrackSourceType GetSourceType()
-        {
-            return source_type;
-        }
-
-        virtual unsigned long long GetStartTP()
-        {
-            return start_tp;
-        }
-
-        virtual LayerSubConfigList& GetLayerInfo()
-        {
-            return sub_layer_list;
-        }
-
-        virtual bool GetMultiStremState()
-        {
-            return multi_stream_enable;
-        }
-
-    protected:
-        QNTrackInfo() {}
-        QNTrackInfo(const QNTrackInfo&) = delete;
-        QNTrackInfo operator = (const QNTrackInfo&) = delete;
+        enum Type {
+            START,
+            STOP,
+            UPDATE,
+        };
+        Type type;
+        int code;
+        std::string message;
     };
+
+    struct QNLocalAudioTrackStats
+    {
+        string trackId = "";
+        int uplinkBitrate = 0;                // 上行音频码率
+        int uplinkRTT = 0;                    // 上行网络 rtt
+        int uplinkLostRate = 0;               // 上行网络丢包率
+    }; 
+
+    struct QNLocalVideoTrackStats
+    {
+        string trackId = "";
+        QNTrackProfile profile = HIGH;           // 该路 track 的 profile
+        int uplinkFrameRate = 0;              // 上行视频帧率
+        int uplinkBitrate = 0;                // 上行视频码率
+        int uplinkRTT = 0;                    // 上行网络 rtt
+        int uplinkLostRate = 0;               // 上行网络丢包率
+        int width = 0;
+        int height = 0;
+    };
+
+    struct QNRemoteAudioTrackStats
+    {
+        string trackId = "";
+        int downlinkBitrate = 0;             // 下行音频码率
+        int downlinkLostRate = 0;            // 下行网络丢包率
+        int uplinkRTT = 0;                   // 上行网络 rtt
+        int uplinkLostRate = 0;              // 上行网络丢包率
+    };
+
+    struct QNRemoteVideoTrackStats
+    {
+        string trackId = "";
+        QNTrackProfile profile = HIGH;          // 该路 track 的 profile
+        int downlinkFrameRate = 0;           // 下行视频帧率（即自己拉取的视频的帧率）
+        int downlinkBitrate = 0;             // 下行视频码率
+        int downlinkLostRate = 0;            // 下行网络丢包率
+        int uplinkRTT = 0;                   // 上行网络 rtt （即远端用户发布视频的网络链路的 rtt）
+        int uplinkLostRate = 0;              // 上行网络丢包率
+        int width = 0;
+        int height = 0;
+    };
+
+    typedef std::list<QNTranscodingLiveStreamingTrack> QNTranscodeingTrackList;
+    typedef std::list<QNAudioDeviceInfo> AudioDeviceInfoList;
+    typedef std::list<UserInfo> UserInfoList;
+    typedef std::list<QNCustomMessage> CustomMessageList;
+    typedef std::list<QNLocalVideoTrackStats> QNLocalVideoStatsList;
+    typedef std::list<QNRemoteVideoTrackStats> QNRemoteVideoStatsList;
 }

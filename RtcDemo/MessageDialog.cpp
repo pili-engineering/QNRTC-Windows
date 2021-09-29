@@ -23,6 +23,9 @@ void MessageDialog::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_RICHEDIT2_MSG_INFO, _msg_rcv_snd_rich_edit_ctrl);
+    _msg_rcv_snd_rich_edit_ctrl.SetWindowTextW(_T(""));
+    _msg_rcv_snd_rich_edit_ctrl.UpdateData();
+    _msg_rcv_snd_rich_edit_ctrl.Invalidate();
 }
 
 

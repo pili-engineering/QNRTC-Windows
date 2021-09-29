@@ -19,7 +19,6 @@ bin_bak/
 objs/
 obj/
 debug/
-release/
 pili-webrtc/
 bin/
 
