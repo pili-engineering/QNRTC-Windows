@@ -1,6 +1,6 @@
 #pragma once
 
-namespace qiniu_v2
+namespace qiniu
 {
 #define QNRTC_OK 0
 #define QNRTC_FAILED -1

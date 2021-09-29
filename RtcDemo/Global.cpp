@@ -8,7 +8,12 @@
 #pragma comment(lib, "Version.lib")
 #endif
 
-extern int GetRoomToken(const string& app_id_, const string room_name_, const string user_id_, string& token_)
+extern int GetRoomToken(const string& app_id_,
+    const string room_name_,
+    const string user_id_,
+    const std::string& host_name_,
+    const int time_out_,
+    string& token_)
 {
     if (room_name_.empty() || user_id_.empty()) {
         return -1;
@@ -41,7 +46,7 @@ extern int GetRoomToken(const string& app_id_, const string room_name_, const st
     
     TRACE(url_buf);
     
-    httplib::Client cli("api-demo.qnsdk.com", 80, 5);
+    httplib::Client cli(host_name_.c_str(), 80, time_out_);
     // send request now
     int status(0);
     auto response_ptr = cli.Get(url_buf);

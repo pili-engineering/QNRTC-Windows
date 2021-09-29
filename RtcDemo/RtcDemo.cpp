@@ -4,7 +4,6 @@
 
 #include "stdafx.h"
 #include "RtcDemo.h"
-#include "RtcDemoDlg.h"
 #include "CRtcDemoV2.h"
 #include "minidump.h"
 
