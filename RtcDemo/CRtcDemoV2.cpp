@@ -96,8 +96,9 @@ BOOL CRtcDemoV2::OnInitDialog()
     qiniu_v2::QNRoomInterface::GetVersion(ver);
     TRACE("Sdk version: %s", ver.c_str());
     qiniu_v2::QNRoomInterface::SetLogParams(qiniu_v2::LOG_INFO, "rtc_log", "rtc.log");
-    
+
     _rtc_room_interface = qiniu_v2::QNRoomInterface::ObtainRoomInterface();
+
     _rtc_room_interface->SetRoomListener(this);
     _rtc_room_interface->EnableStatistics(1000);
 
@@ -286,6 +287,7 @@ void CRtcDemoV2::InitUI()
 
     ((CComboBox *)GetDlgItem(IDC_COMBO_CLIP_CROP))->InsertString(-1, utf2unicode("camera").c_str());
     ((CComboBox *)GetDlgItem(IDC_COMBO_CLIP_CROP))->InsertString(-1, utf2unicode("video external").c_str());
+    ((CComboBox *)GetDlgItem(IDC_COMBO_CLIP_CROP))->InsertString(-1, utf2unicode("screen").c_str());
     ((CComboBox *)GetDlgItem(IDC_COMBO_CLIP_CROP))->SetCurSel(0);
 
     if (_enable_simulcast) {
@@ -1393,8 +1395,10 @@ void CRtcDemoV2::OnBnClickedButtonLogin()
     int clip_crop_source = ((CComboBox*)GetDlgItem(IDC_COMBO_CLIP_CROP))->GetCurSel();
     if (clip_crop_source == 0) {
         _src_capturer_source = qiniu_v2::tst_Camera;
-    } else {
+    } else if (clip_crop_source == 1) {
         _src_capturer_source = qiniu_v2::tst_ExternalYUV;
+    } else {
+        _src_capturer_source = qiniu_v2::tst_ScreenCasts;
     }
 
     if (1 == ((CButton*)GetDlgItem(IDC_CHECK_CLIP))->GetCheck()) {
