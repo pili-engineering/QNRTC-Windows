@@ -373,6 +373,14 @@ namespace qiniu_v2 {
         // @param url_ dns 服务器地址 
         virtual void SetDnsServerUrl(const std::string& url_) = 0;
 
+        // 设置是否开关音频冗余功能，默认开启 
+        // @param enable_  true or false 
+        virtual void SetEnableAudioRedundant(bool enable_) = 0;
+
+        // 设置是否开关视频数据包纠错功能，默认开启 
+        // @param enable_  true or false 
+        virtual void SetEnableVideoErrorCorrection(bool enable_) = 0;
+
     protected:
         virtual ~QNRoomInterface() {}
     };
