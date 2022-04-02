@@ -18,9 +18,6 @@
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="RtcDemo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="stdafx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -48,24 +45,21 @@
     <ClInclude Include="httplib.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="RtcDemoDlg.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="MergeDialog.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="MessageDialog.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="RtcDemo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="StatsDialog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="RtcDemo.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="stdafx.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="CRtcDemoV2.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Global.cpp">
@@ -74,13 +68,19 @@
     <ClCompile Include="CVdieoRenderWnd.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="RtcDemoDlg.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="MergeDialog.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="MessageDialog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RtcDemo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="StatsDialog.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CRtcDemoV2.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -93,6 +93,7 @@
     <None Include="res\RtcDemo.rc2">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="RtcDemo.aps" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="res\RtcDemo.ico">

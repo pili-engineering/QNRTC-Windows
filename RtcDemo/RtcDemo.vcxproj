@@ -99,8 +99,9 @@
       <PrecompiledHeader>Create</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)../Release/include/cpp/qiniu;$(ProjectDir)../Release/include/cpp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>
+      </AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <DisableSpecificWarnings>
       </DisableSpecificWarnings>
@@ -108,9 +109,10 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalLibraryDirectories>$(ProjectDir)../Release/lib/$(PlatformTarget)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ShowProgress>LinkVerboseLib</ShowProgress>
-      <AdditionalDependencies>QNRTCStreamingD.lib</AdditionalDependencies>
+      <AdditionalDependencies>
+      </AdditionalDependencies>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -123,8 +125,8 @@
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <PostBuildEvent>
-      <Command>copy $(SolutionDir)$(Configuration)\$(TargetFileName) $(ProjectDir)..\bin\$(PlatformTarget)
-copy $(SolutionDir)$(Configuration)\$(TargetName).pdb $(ProjectDir)..\bin\$(PlatformTarget)</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -133,13 +135,16 @@ copy $(SolutionDir)$(Configuration)\$(TargetName).pdb $(ProjectDir)..\bin\$(Plat
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>__WINDOWS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)../Release/include/cpp/qiniu;$(ProjectDir)../Release/include/cpp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>
+      </AdditionalIncludeDirectories>
       <MinimalRebuild>false</MinimalRebuild>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalLibraryDirectories>$(ProjectDir)../Release/lib/$(PlatformTarget)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>QNRTCStreamingD.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>
+      </AdditionalLibraryDirectories>
+      <AdditionalDependencies>
+      </AdditionalDependencies>
     </Link>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -152,8 +157,8 @@ copy $(SolutionDir)$(Configuration)\$(TargetName).pdb $(ProjectDir)..\bin\$(Plat
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <PostBuildEvent>
-      <Command>copy $(SolutionDir)$(PlatformTarget)\$(Configuration)\$(TargetFileName) $(ProjectDir)..\bin\$(PlatformTarget)
-copy $(SolutionDir)$(PlatformTarget)\$(Configuration)\$(TargetName).pdb $(ProjectDir)..\bin\$(PlatformTarget)</Command>
+      <Command>copy $(SolutionDir)$(PlatformTarget)\$(Configuration)\$(TargetFileName)  $(PLIL-RTC-PC-KIT)\Release\windows\lib\x64\debug
+copy $(SolutionDir)$(PlatformTarget)\$(Configuration)\$(TargetName).pdb  $(PLIL-RTC-PC-KIT)\Release\windows\lib\x64\debug</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -164,14 +169,15 @@ copy $(SolutionDir)$(PlatformTarget)\$(Configuration)\$(TargetName).pdb $(Projec
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)../Release/include/cpp/qiniu;$(ProjectDir)../Release/include/cpp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\Release\include\cpp</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>$(ProjectDir)../Release/lib/$(PlatformTarget)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\Release\lib\x86</AdditionalLibraryDirectories>
       <AdditionalDependencies>QNRTCStreaming.lib</AdditionalDependencies>
       <GenerateDebugInformation>DebugFastLink</GenerateDebugInformation>
     </Link>
@@ -186,8 +192,7 @@ copy $(SolutionDir)$(PlatformTarget)\$(Configuration)\$(TargetName).pdb $(Projec
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <PostBuildEvent>
-      <Command>copy $(SolutionDir)$(Configuration)\$(TargetFileName) $(ProjectDir)..\bin\$(PlatformTarget)
-copy $(SolutionDir)$(Configuration)\$(TargetName).pdb $(ProjectDir)..\bin\$(PlatformTarget)</Command>
+      <Command>copy $(SolutionDir)$(Configuration)\$(TargetFileName)  $(PLIL-RTC-PC-KIT)\Release\windows\lib\x86\release</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -198,7 +203,7 @@ copy $(SolutionDir)$(Configuration)\$(TargetName).pdb $(ProjectDir)..\bin\$(Plat
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>_WINDOWS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)../Release/include/cpp/qiniu;$(ProjectDir)../Release/include/cpp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\Release\include\cpp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -206,7 +211,7 @@ copy $(SolutionDir)$(Configuration)\$(TargetName).pdb $(ProjectDir)..\bin\$(Plat
       <OptimizeReferences>true</OptimizeReferences>
       <ShowProgress>LinkVerboseLib</ShowProgress>
       <AdditionalDependencies>QNRTCStreaming.lib</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(ProjectDir)../Release/lib/$(PlatformTarget)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\Release\lib\x64</AdditionalLibraryDirectories>
       <GenerateDebugInformation>DebugFastLink</GenerateDebugInformation>
     </Link>
     <Midl>
@@ -220,8 +225,7 @@ copy $(SolutionDir)$(Configuration)\$(TargetName).pdb $(ProjectDir)..\bin\$(Plat
       <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <PostBuildEvent>
-      <Command>copy $(SolutionDir)$(PlatformTarget)\$(Configuration)\$(TargetFileName) $(ProjectDir)..\bin\$(PlatformTarget)
-copy $(SolutionDir)$(PlatformTarget)\$(Configuration)\$(TargetName).pdb $(ProjectDir)..\bin\$(PlatformTarget)</Command>
+      <Command>copy $(SolutionDir)$(PlatformTarget)\$(Configuration)\$(TargetFileName)  $(PLIL-RTC-PC-KIT)\Release\windows\lib\x64\release</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -238,17 +242,13 @@ copy $(SolutionDir)$(PlatformTarget)\$(Configuration)\$(TargetName).pdb $(Projec
     <ClInclude Include="minidump.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="RtcDemo.h" />
-    <ClInclude Include="RtcDemoDlg.h" />
+    <ClInclude Include="StatsDialog.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CRtcDemoV2.cpp" />
     <ClCompile Include="CVdieoRenderWnd.cpp" />
-    <ClCompile Include="CRtcDemoV2.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
-    </ClCompile>
     <ClCompile Include="Global.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Use</PrecompiledHeader>
     </ClCompile>
@@ -258,7 +258,7 @@ copy $(SolutionDir)$(PlatformTarget)\$(Configuration)\$(TargetName).pdb $(Projec
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="RtcDemo.cpp" />
-    <ClCompile Include="RtcDemoDlg.cpp" />
+    <ClCompile Include="StatsDialog.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -271,6 +271,7 @@ copy $(SolutionDir)$(PlatformTarget)\$(Configuration)\$(TargetName).pdb $(Projec
   </ItemGroup>
   <ItemGroup>
     <None Include="res\RtcDemo.rc2" />
+    <None Include="RtcDemo.aps" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="res\RtcDemo.ico" />

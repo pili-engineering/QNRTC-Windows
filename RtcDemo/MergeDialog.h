@@ -59,6 +59,11 @@ public:
     } _merge_config;
 
     #define MERGE_MESSAGE_ID    100
+    #define MERGE_MESSAGE_CONFIG_ID MERGE_MESSAGE_ID + 1
+    #define MERGE_MESSAGE_LOCAL_AUDIO_ID MERGE_MESSAGE_ID + 2
+    #define MERGE_MESSAGE_LOCAL_VIDEO_ID MERGE_MESSAGE_ID + 3
+    #define MERGE_MESSAGE_REMOTE_AUDIO_ID MERGE_MESSAGE_ID + 4
+    #define MERGE_MESSAGE_REMOTE_VIDEO_ID MERGE_MESSAGE_ID + 5
 
 // Dialog Data
 #ifdef AFX_DESIGN_TIME
@@ -70,4 +75,9 @@ protected:
     virtual BOOL OnInitDialog();
 
 	DECLARE_MESSAGE_MAP()
+   public:
+    afx_msg void OnBnClickedCheckLocalAudio();
+    afx_msg void OnBnClickedCheckLocalVideo();
+    afx_msg void OnBnClickedCheckRemoteAudio();
+    afx_msg void OnBnClickedCheckRemoteVideo();
 };
