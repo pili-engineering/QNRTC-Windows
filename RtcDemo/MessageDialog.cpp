@@ -23,6 +23,9 @@ void MessageDialog::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_RICHEDIT2_MSG_INFO, _msg_rcv_snd_rich_edit_ctrl);
+    _msg_rcv_snd_rich_edit_ctrl.SetWindowTextW(_T(""));
+    _msg_rcv_snd_rich_edit_ctrl.UpdateData();
+    _msg_rcv_snd_rich_edit_ctrl.Invalidate();
 }
 
 
@@ -38,7 +41,12 @@ void MessageDialog::OnBnClickedButtonSendMsg()
 {
 	// TODO: 在此添加控件通知处理程序代码
 	CString sndMsg;
-	GetDlgItemText(IDC_EDIT_MSG_SEND, sndMsg);
+	int ret = 0;
+	if (ret == 0) {
+		sndMsg = "default";
+	}
+	ret = GetDlgItemText(IDC_EDIT_MSG_SEND, sndMsg);
+
 	::SendMessage(this->GetParent()->m_hWnd, SEND_MESSAGE_ID , 0, (LPARAM)(LPCTSTR)sndMsg);
 	
 	time_t tt = time(NULL);
