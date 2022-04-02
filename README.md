@@ -3,8 +3,8 @@
 QNRTCWin 是七牛云推出的一款适用于 Windows 平台的实时音视频 SDK，提供了包括音视频通话、水印等多种功能，提供灵活的接口，支持高度定制以及二次开发。
 
 注意
->  - QNRTC Windows SDK v4.x 版本是在  3.x 的基础上进行了 API 的重构和优化，从而使使用者能够更加高效的接入，所以新接入的用户推荐使用最新版本的 SDK。
-> - 由于 QNRTC Windows SDK v4.x 向下不兼容，因此，如果您是老版本用户并希望升级到最新版本以获得更好的用户体验，可参考 [4.0x 版本升级指南](https://developer.qiniu.com/rtc/9605/migration-guide-window)进行迁版本升级。
+>  - QNRTC Windows SDK v5.x 版本是在  3.x 的基础上进行了 API 的重构和优化，从而使使用者能够更加高效的接入，所以新接入的用户推荐使用最新版本的 SDK。
+> - 由于 QNRTC Windows SDK v5.x 向下不兼容，因此，如果您是老版本用户并希望升级到最新版本以获得更好的用户体验，可参考 [5.0x 版本升级指南](https://developer.qiniu.com/rtc/9605/migration-guide-window)进行迁版本升级。
 > - 老用户也可以继续使用 QNRTC Windows SDK v3.x 版本，我们也会继续在此版本上进行问题修复和版本迭代，但是后续一些新功能有可能并不会在 3.x 把呢不能上提供。若您决定继续使用 3.x 版本 SDK，则可参考 [3.x 及之前版本版本的相关文档](https://doc.qnsdk.com/rtn/windows)
 
 # 2 功能列表

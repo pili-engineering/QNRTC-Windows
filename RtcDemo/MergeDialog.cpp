@@ -72,84 +72,162 @@ BOOL MergeDialog::OnInitDialog()
 BEGIN_MESSAGE_MAP(MergeDialog, CDialogEx)
     ON_BN_CLICKED(IDC_BUTTON_MERGE_OK, &MergeDialog::OnBnClickedButtonMergeOk)
     ON_BN_CLICKED(IDC_BUTTON_MERGE_CANCEL, &MergeDialog::OnBnClickedButtonMergeCancel)
-END_MESSAGE_MAP()
+    ON_BN_CLICKED(IDC_CHECK_LOCAL_AUDIO,
+                  &MergeDialog::OnBnClickedCheckLocalAudio)
+    ON_BN_CLICKED(IDC_CHECK_LOCAL_VIDEO,
+                  &MergeDialog::OnBnClickedCheckLocalVideo)
+    ON_BN_CLICKED(IDC_CHECK_REMOTE_AUDIO,
+                  &MergeDialog::OnBnClickedCheckRemoteAudio)
+    ON_BN_CLICKED(IDC_CHECK_REMOTE_VIDEO,
+                  &MergeDialog::OnBnClickedCheckRemoteVideo)
+    END_MESSAGE_MAP()
 
 void MergeDialog::OnBnClickedButtonMergeOk()
 {
     CString tmp_cstr;
-
-    GetDlgItemText(IDC_EDIT_PUB_URL, tmp_cstr);
+    int ret = 0;
+    ret = GetDlgItemText(IDC_EDIT_PUB_URL, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.publish_url   =  unicode2utf(tmp_cstr.GetBuffer());
 
-    GetDlgItemText(IDC_EDIT_MERGE_W, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_MERGE_W, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.job_width = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
 
-    GetDlgItemText(IDC_EDIT_MERGE_H, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_MERGE_H, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.job_height    = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
 
-    GetDlgItemText(IDC_EDIT_MERGE_FPS, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_MERGE_FPS, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.job_fps       = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
 
     _merge_config.job_stretch_mode = ((CComboBox*)GetDlgItem(IDC_COMBO_STRETCH_MODE))->GetCurSel();
 
     _merge_config.hold_last_frame = ((CComboBox*)GetDlgItem(IDC_COMBO_HOLD_LAST_FRAME))->GetCurSel();
 
-    GetDlgItemText(IDC_EDIT_MERGE_BITRATE, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_MERGE_BITRATE, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.job_bitrate   = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str()) * 1000;
     _merge_config.job_min_bitrate   = _merge_config.job_bitrate - (200 * 1000);
     _merge_config.job_max_bitrate   = _merge_config.job_bitrate + (200 * 1000);
 
-    GetDlgItemText(IDC_EDIT_WATER_URL, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_WATER_URL, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.watermark_url = unicode2utf(tmp_cstr.GetBuffer());
 
-    GetDlgItemText(IDC_EDIT_WATER_W, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_WATER_W, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.watermark_width   = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
-    GetDlgItemText(IDC_EDIT_WATER_H, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_WATER_H, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.watermark_height  = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
 
-    GetDlgItemText(IDC_EDIT_WATER_X, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_WATER_X, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.watermark_x   = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
-    GetDlgItemText(IDC_EDIT_WATER_Y, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_WATER_Y, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.watermark_y   = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
 
-    GetDlgItemText(IDC_EDIT_BG_URL, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_BG_URL, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.background_url = unicode2utf(tmp_cstr.GetBuffer());
 
-    GetDlgItemText(IDC_EDIT_BG_W, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_BG_W, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.background_width   = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
-    GetDlgItemText(IDC_EDIT_BG_H, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_BG_H, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "";
+    }
     _merge_config.background_height = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
 
-    GetDlgItemText(IDC_EDIT_BG_X, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_BG_X, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.background_x  = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
-    GetDlgItemText(IDC_EDIT_BG_Y, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_BG_Y, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.background_y  = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
 
     _merge_config.merge_local_audio = ((CButton*)GetDlgItem(IDC_CHECK_LOCAL_AUDIO))->GetCheck();
     _merge_config.merge_local_video = ((CButton*)GetDlgItem(IDC_CHECK_LOCAL_VIDEO))->GetCheck();
 
-    GetDlgItemText(IDC_EDIT_LOCAL_W, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_LOCAL_W, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.local_video_width     = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
-    GetDlgItemText(IDC_EDIT_LOCAL_H, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_LOCAL_H, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.local_video_height     = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
-    GetDlgItemText(IDC_EDIT_LOCAL_X, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_LOCAL_X, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.local_video_x     = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
-    GetDlgItemText(IDC_EDIT_LOCAL_Y, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_LOCAL_Y, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.local_video_y     = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
 
 
     _merge_config.merge_remote_audio = ((CButton*)GetDlgItem(IDC_CHECK_REMOTE_AUDIO))->GetCheck();
     _merge_config.merge_remote_video = ((CButton*)GetDlgItem(IDC_CHECK_REMOTE_VIDEO))->GetCheck();
-    GetDlgItemText(IDC_EDIT_REMOTE_W, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_REMOTE_W, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.remote_video_width     = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
-    GetDlgItemText(IDC_EDIT_REMOTE_H, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_REMOTE_H, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.remote_video_height     = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
-    GetDlgItemText(IDC_EDIT_REMOTE_X, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_REMOTE_X, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.remote_video_x     = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
-    GetDlgItemText(IDC_EDIT_REMOTE_Y, tmp_cstr);
+    ret = GetDlgItemText(IDC_EDIT_REMOTE_Y, tmp_cstr);
+    if (ret == 0) {
+      tmp_cstr = "0";
+    }
     _merge_config.remote_video_y     = std::stoi(unicode2utf(tmp_cstr.GetBuffer()).c_str());
 
-    ::SendMessage(this->GetParent()->m_hWnd, MERGE_MESSAGE_ID /* ID */, 0, (LPARAM)&_merge_config);
+    ::SendMessage(this->GetParent()->m_hWnd, MERGE_MESSAGE_ID,
+                  MERGE_MESSAGE_CONFIG_ID, (LPARAM)&_merge_config);
 
     CDialog::OnOK();
 }
@@ -158,4 +236,44 @@ void MergeDialog::OnBnClickedButtonMergeOk()
 void MergeDialog::OnBnClickedButtonMergeCancel()
 {
     CDialog::OnCancel();
+}
+
+void MergeDialog::OnBnClickedCheckLocalAudio() {
+  bool merge_flag = false;
+  if (1 == ((CButton *)GetDlgItem(IDC_CHECK_LOCAL_AUDIO))->GetCheck()) {
+    merge_flag = true;
+  }
+  ::SendMessage(this->GetParent()->m_hWnd, MERGE_MESSAGE_ID,
+                MERGE_MESSAGE_LOCAL_AUDIO_ID,
+                (LPARAM)merge_flag);
+}
+
+void MergeDialog::OnBnClickedCheckLocalVideo() {
+  bool merge_flag = false;
+  if (1 == ((CButton *)GetDlgItem(IDC_CHECK_LOCAL_VIDEO))->GetCheck()) {
+    merge_flag = true;
+  }
+  ::SendMessage(this->GetParent()->m_hWnd, MERGE_MESSAGE_ID,
+                MERGE_MESSAGE_LOCAL_VIDEO_ID,
+                (LPARAM)merge_flag);
+}
+
+void MergeDialog::OnBnClickedCheckRemoteAudio() {
+  bool merge_flag = false;
+  if (1 == ((CButton *)GetDlgItem(IDC_CHECK_REMOTE_AUDIO))->GetCheck()) {
+    merge_flag = true;
+  }
+  ::SendMessage(this->GetParent()->m_hWnd, MERGE_MESSAGE_ID,
+                MERGE_MESSAGE_REMOTE_AUDIO_ID,
+                (LPARAM)merge_flag);
+}
+
+void MergeDialog::OnBnClickedCheckRemoteVideo() {
+  bool merge_flag = false;
+  if (1 == ((CButton *)GetDlgItem(IDC_CHECK_REMOTE_VIDEO))->GetCheck()) {
+    merge_flag = true;
+  }
+  ::SendMessage(this->GetParent()->m_hWnd, MERGE_MESSAGE_ID,
+                MERGE_MESSAGE_REMOTE_VIDEO_ID,
+                (LPARAM)merge_flag);
 }

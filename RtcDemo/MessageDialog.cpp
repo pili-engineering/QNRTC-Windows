@@ -41,7 +41,12 @@ void MessageDialog::OnBnClickedButtonSendMsg()
 {
 	// TODO: 在此添加控件通知处理程序代码
 	CString sndMsg;
-	GetDlgItemText(IDC_EDIT_MSG_SEND, sndMsg);
+	int ret = 0;
+	if (ret == 0) {
+		sndMsg = "default";
+	}
+	ret = GetDlgItemText(IDC_EDIT_MSG_SEND, sndMsg);
+
 	::SendMessage(this->GetParent()->m_hWnd, SEND_MESSAGE_ID , 0, (LPARAM)(LPCTSTR)sndMsg);
 	
 	time_t tt = time(NULL);
